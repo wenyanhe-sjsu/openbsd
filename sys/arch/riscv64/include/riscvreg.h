@@ -1,6 +1,15 @@
 /*-
  * Copyright (c) 2019 Brian Bamsch <bbamsch@google.com>
+ * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
+ *
+ * Portions of this software were developed by SRI International and the
+ * University of Cambridge Computer Laboratory under DARPA/AFRL contract
+ * FA8750-10-C-0237 ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Portions of this software were developed by the University of Cambridge
+ * Computer Laboratory as part of the CTSRD Project, with support from the
+ * UK Higher Education Innovation Fund (HEIF).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,6 +19,9 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived from
+ *    this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -153,7 +165,7 @@
 #define SATP_MODE_SV64		(11ULL << SATP_MODE_SHIFT)
 
 #define XLEN			64
-#define XLEN_BYTES		8 // (XLEN / 8)
+#define XLEN_BYTES		(XLEN / 8)
 #define INSN_SIZE		4
 #define INSN_C_SIZE		2
 
