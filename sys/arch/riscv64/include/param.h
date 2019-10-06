@@ -13,6 +13,9 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -25,85 +28,59 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_PARAM_H_
-#define	_MACHINE_PARAM_H_
+#define _MACHINE_PARAM_H_
+
+#ifdef _KERNEL
+#ifndef _LOCORE
+#include <machine/cpu.h>
+#endif
+#endif
+
+#define _MACHINE	riscv64
+#define MACHINE		"riscv64"
+#define _MACHINE_ARC	riscv64
+#define MACHINE_ARCH	"riscv64"
+#define MID_MACHINE	MID_RISCV64
+
+#define PAGE_SHIFT	12
+#define PAGE_SIZE	(1 << PAGE_SHIFT)
+#define PAGE_MASK	(PAGE_SIZE - 1)
+
+#define KERNBASE	0xffffff8000000000ULL	/* start of kernel virtual space */
+
+#ifdef _KERNEL
+
+#define NBPG		PAGE_SIZE		/* bytes/page */
+#define PGSHIFT		PAGE_SHIFT		/* LOG2(PAGE_SIZE) */
+#define PGOFSET		PAGE_MASK		/* byte offset into page */
+
+#define UPAGES		5			/* XXX pages of u-area */
+#define USPACE		(UPAGES * PAGE_SIZE)	/* XXX total size of u-area */
+#define USPACE_ALIGN	0			/* XXX u-area alignment 0-none */
+
+#define NMBCLUSTERS	(64 * 1024)		/* XXX max cluster allocation */
+
+#ifndef MSGBUFSIZE
+#define MSGBUFSIZE	(16 * PAGE_SIZE)	/* XXX default message buffer size */
+#endif
 
 /*
- * Machine dependent constants for RISC-V.
+ * XXX Maximum size of the kernel malloc arena in PAGE_SIZE-sized
+ * logical pages.
  */
+#define NKMEMPAGES_MAX_DEFAULT	((128 * 1024 * 1024) >> PAGE_SHIFT)
 
-#include <machine/_types.h>
+#define STACKALIGNBYTES		(16 - 1)
+#define STACKALIGN(p)		((u_long)(p) &~ STACKALIGNBYTES)
 
-#define	STACKALIGNBYTES	(16 - 1)
-#define	STACKALIGN(p)	((uint64_t)(p) & ~STACKALIGNBYTES)
+// XXX Advanced Configuration and Power Interface
+#define __HAVE_ACPI
+// XXX Flattened Device Tree
+#define __HAVE_FDT
 
-#ifndef MACHINE
-#define	MACHINE		"riscv"
-#endif
-#ifndef MACHINE_ARCH
-#define	MACHINE_ARCH	"riscv64"
-#endif
+#endif /* _KERNEL */
 
-#if defined(SMP) || defined(KLD_MODULE)
-#ifndef MAXCPU
-#define	MAXCPU		16
-#endif
-#else
-#define	MAXCPU		1
-#endif /* SMP || KLD_MODULE */
-
-#ifndef MAXMEMDOM
-#define	MAXMEMDOM	1
-#endif
-
-#define	ALIGNBYTES	_ALIGNBYTES
-#define	ALIGN(p)	_ALIGN(p)
-/*
- * ALIGNED_POINTER is a boolean macro that checks whether an address
- * is valid to fetch data elements of type t from on this architecture.
- * This does not reflect the optimal alignment, just the possibility
- * (within reasonable limits).
- */
-// commented out by Mars 1004, redundant with _types.h
-// #define	ALIGNED_POINTER(p, t)	((((u_long)(p)) & (sizeof(t) - 1)) == 0)
-
-/*
- * CACHE_LINE_SIZE is the compile-time maximum cache line size for an
- * architecture.  It should be used with appropriate caution.
- */
-#define	CACHE_LINE_SHIFT	6
-#define	CACHE_LINE_SIZE		(1 << CACHE_LINE_SHIFT)
-
-#define	PAGE_SHIFT	12
-#define	PAGE_SIZE	(1 << PAGE_SHIFT)	/* Page size */
-#define	PAGE_MASK	(PAGE_SIZE - 1)
-
-#define	MAXPAGESIZES	3	/* maximum number of supported page sizes */
-
-#ifndef KSTACK_PAGES
-#define	KSTACK_PAGES	4	/* pages of kernel stack (with pcb) */
-#endif
-
-#define	KSTACK_GUARD_PAGES	1	/* pages of kstack guard; 0 disables */
-#define	PCPU_PAGES		1
-
-/*
- * Mach derived conversion macros
- */
-#define	round_page(x)		(((unsigned long)(x) + PAGE_MASK) & ~PAGE_MASK)
-#define	trunc_page(x)		((unsigned long)(x) & ~PAGE_MASK)
-
-#define	atop(x)			((unsigned long)(x) >> PAGE_SHIFT)
-#define	ptoa(x)			((unsigned long)(x) << PAGE_SHIFT)
-
-#define	riscv_btop(x)		((unsigned long)(x) >> PAGE_SHIFT)
-#define	riscv_ptob(x)		((unsigned long)(x) << PAGE_SHIFT)
-
-#define	pgtok(x)		((unsigned long)(x) * (PAGE_SIZE / 1024))
-
-#endif /* !_MACHINE_PARAM_H_ */
+#endif /* _MACHINE_PARAM_H_ */
