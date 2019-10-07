@@ -81,7 +81,7 @@
 #define MSTATUS_UXL_MASK	(0x3 << MSTATUS_UXL_SHIFT)
 #define MSTATUS_SXL_SHIFT	34
 #define MSTATUS_SXL_MASK	(0x3 << MSTATUS_SXL_SHIFT)
-#define MSTATUS_SD		(1 << 63)
+#define MSTATUS_SD		(1 << (MXLEN - 1))
 
 #define SSTATUS_UIE		(1 << 0)
 #define SSTATUS_SIE		(1 << 1)
@@ -100,7 +100,7 @@
 #define SSTATUS_MXR		(1 << 19)
 #define SSTATUS_UXL_SHIFT	32
 #define SSTATUS_UXL_MASK	(0x3 << SSTATUS_UXL_SHIFT)
-#define SSTATUS_SD		(1 << 63)
+#define SSTATUS_SD		(1 << (SXLEN - 1))
 
 #define USTATUS_UIE		(1 << 0)
 #define USTATUS_UPIE		(1 << 4)
@@ -164,8 +164,22 @@
 #define SATP_MODE_SV57		(10ULL << SATP_MODE_SHIFT)
 #define SATP_MODE_SV64		(11ULL << SATP_MODE_SHIFT)
 
+/**
+ * As of RISC-V Machine ISA v1.11, the XLEN can vary between
+ * Machine, Supervisor, and User modes. The Machine XLEN (MXLEN)
+ * is resolved from the MXL field of the 'misa' CSR. The
+ * Supervisor XLEN (SXLEN) and User XLEN (UXLEN) are resolved
+ * from the SXL and UXL fields of the 'mstatus' CSR, respectively.
+ *
+ * The Machine XLEN is reset to the widest supported ISA variant
+ * at machine reset. For now, assume that all modes will always
+ * use the same, static XLEN of 64 bits.
+ */
 #define XLEN			64
 #define XLEN_BYTES		(XLEN / 8)
+#define MXLEN			XLEN
+#define SXLEN			XLEN
+#define UXLEN			XLEN
 #define INSN_SIZE		4
 #define INSN_C_SIZE		2
 
