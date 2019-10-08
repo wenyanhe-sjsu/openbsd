@@ -1,3 +1,4 @@
+/* $OpenBSD: exec.h,v 1.2 2017/02/08 05:09:25 guenther Exp $ */
 /*
  * Copyright (c) 2014 Patrick Wildt <patrick@blueri.se>
  *
