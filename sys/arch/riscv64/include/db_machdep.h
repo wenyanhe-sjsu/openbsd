@@ -1,4 +1,4 @@
-*-
+/*
  * Copyright (c) 2015-2016 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
@@ -37,6 +37,7 @@
 #ifndef	_MACHINE_DB_MACHDEP_H_
 #define	_MACHINE_DB_MACHDEP_H_
 
+#include <sys/param.h>
 #include <machine/riscvreg.h>
 #include <machine/frame.h>
 #include <machine/trap.h>
@@ -44,12 +45,13 @@
 #define	T_BREAKPOINT	(EXCP_BREAKPOINT)
 #define	T_WATCHPOINT	(0)
 
-typedef vm_offset_t	db_addr_t;
+typedef vaddr_t 	db_addr_t;
 typedef long		db_expr_t;
 
-#define	PC_REGS()	((db_addr_t)kdb_thrctx->pcb_sepc)
+#define	PC_REGS(regs)	((db_addr_t)(regs)->tf_ra)
+#define	SET_PC_REGS(regs, value) (regs)->tf_ra = (int)(value)
 
-#define	BKPT_INST	(0x00100073)
+#define	BKPT_INST	(KERNEL_BREAKPOINT)
 #define	BKPT_SIZE	(INSN_SIZE)
 #define	BKPT_SET(inst)	(BKPT_INST)
 
@@ -69,20 +71,31 @@ typedef long		db_expr_t;
 				 ((ins) & 0x7f) == 103) /* jal, jalr */
 
 #define	inst_load(ins) ({							\
-	uint32_t tmp_instr = db_get_value(PC_REGS(), sizeof(uint32_t), FALSE);	\
+	uint64_t tmp_instr = db_get_value(PC_REGS(regs), sizeof(uint64_t), FALSE);	\
 	is_load_instr(tmp_instr);						\
 })
 
 #define	inst_store(ins) ({							\
-	uint32_t tmp_instr = db_get_value(PC_REGS(), sizeof(uint32_t), FALSE);	\
+	uint64_t tmp_instr = db_get_value(PC_REGS(regs), sizeof(uint64_t), FALSE);	\
 	is_store_instr(tmp_instr);						\
 })
 
 #define	is_load_instr(ins)	(((ins) & 0x7f) == 3)
 #define	is_store_instr(ins)	(((ins) & 0x7f) == 35)
 
-#define	next_instr_address(pc, bd)	((bd) ? (pc) : ((pc) + 4))
+#define	next_instr_address(pc, bd)	((bd) ? (pc) : ((pc) + 4)) // INSN_SIZE == 4 ??
 
-#define	DB_ELFSIZE		64
+#define DB_MACHINE_COMMANDS
+
+#define SOFTWARE_SSTEP
+
+#define branch_taken(ins, pc, fun, regs) \
+	db_branch_taken((ins), (pc), (regs))
+
+/* For ddb_state */
+#define DDB_STATE_NOT_RUNNING	0
+#define DDB_STATE_RUNNING	1
+#define DDB_STATE_EXITING	2
 
 #endif /* !_MACHINE_DB_MACHDEP_H_ */
+
