@@ -98,4 +98,3 @@ typedef long		db_expr_t;
 #define DDB_STATE_EXITING	2
 
 #endif /* !_MACHINE_DB_MACHDEP_H_ */
-
