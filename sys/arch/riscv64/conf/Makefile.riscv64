@@ -45,7 +45,7 @@ CMACHFLAGS=	-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 CMACHFLAGS+=	-ffreestanding ${NOPIE_FLAGS}
 SORTR=		sort -R
 .if ${IDENT:M-DNO_PROPOLICE}
-CMACHFLAGS+=	-fno-stack-protector
+CMACHFLAGS+=	-march=rv64gc -fno-stack-protector
 .endif
 .if ${IDENT:M-DSMALL_KERNEL}
 SORTR=		cat
