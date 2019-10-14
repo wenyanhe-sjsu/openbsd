@@ -10,3 +10,4 @@ revisit settings in param.h (FDT / ACPI / U-Area / Clusters / Buffer)
         amoor.w zero, 32, 0(a0)
                                ^
 
+are physmap vars necessary in bootconfig.h ???
