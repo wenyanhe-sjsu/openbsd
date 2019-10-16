@@ -45,7 +45,7 @@
  * CLKF_USERMODE: Return TRUE/FALSE (1/0) depending on whether the
  * frame came from USR mode or not.
  */
-#define CLKF_USERMODE(frame)	((frame->tf_sstatus & SSTATUS_SSP) == 0)
+#define CLKF_USERMODE(frame)	((frame->tf_sstatus & SSTATUS_SPP) == 0)
 
 /*
  * CLKF_INTR: True if we took the interrupt from inside another
