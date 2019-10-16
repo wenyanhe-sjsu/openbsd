@@ -25,9 +25,10 @@
 static inline void
 atomic_setbits_int(volatile unsigned int *p, unsigned int v)
 {
-	__asm __volatile("amoor.w zero, %1, %0"
-	    : "=m" (*p)
-	    : "ir" (v));
+	__asm __volatile("amoor.w zero, %1, (%0)"
+	    : "+r" (*p)
+	    : "r" (v)
+	    : "memory");
 }
 
 /*
@@ -37,9 +38,10 @@ atomic_setbits_int(volatile unsigned int *p, unsigned int v)
 static inline void
 atomic_clearbits_int(volatile unsigned int *p, unsigned int v)
 {
-	__asm __volatile("amoand.w zero, %1, %0"
-	    : "=m" (*p)
-	    : "ir" (~v));
+	__asm __volatile("amoand.w zero, %1, (%0)"
+	    : "+r" (*p)
+	    : "r" (~v)
+	    : "memory");
 }
 
 #endif /* defined(_KERNEL) */

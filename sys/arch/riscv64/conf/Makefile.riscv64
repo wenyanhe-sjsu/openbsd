@@ -41,7 +41,8 @@ CWARNFLAGS=	-Werror -Wall -Wimplicit-function-declaration \
 		-Wno-constant-conversion -Wno-address-of-packed-member \
 		-Wframe-larger-than=2047
 
-CMACHFLAGS=	-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
+CMACHFLAGS=	-march=rv64gc \
+		-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 CMACHFLAGS+=	-ffreestanding ${NOPIE_FLAGS}
 SORTR=		sort -R
 .if ${IDENT:M-DNO_PROPOLICE}
