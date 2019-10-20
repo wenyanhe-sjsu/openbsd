@@ -13,3 +13,5 @@ atomic instruction constraints in atomic.h may need to switch to +A (if LLVM all
                                ^
 
 are physmap vars necessary in bootconfig.h ???
+
+Look into implementing riscv64/cpufunc.c, if necessary

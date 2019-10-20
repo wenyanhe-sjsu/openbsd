@@ -89,7 +89,6 @@ extern struct pmap kernel_pmap_;
 vaddr_t pmap_bootstrap(long kvo, paddr_t lpt1,  long kernelstart,
     long kernelend, long ram_start, long ram_end);
 void pmap_kenter_cache(vaddr_t va, paddr_t pa, vm_prot_t prot, int cacheable);
-void pmap_page_ro(pmap_t pm, vaddr_t va, vm_prot_t prot);
 
 paddr_t pmap_steal_avail(size_t size, int align, void **kva);
 void pmap_avail_fixup();
