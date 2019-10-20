@@ -39,7 +39,7 @@
 #define _MACHINE_REG_H_
 
 struct reg {
-	uint64_t	r_ra		/* return address */
+	uint64_t	r_ra;		/* return address */
 	uint64_t	r_sp;		/* stack pointer */
 	uint64_t	r_gp;		/* global pointer */
 	uint64_t	r_tp;		/* thread pointer */
