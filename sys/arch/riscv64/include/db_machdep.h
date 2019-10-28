@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2019 Brian Bamsch <bbamsch@google.com>
  * Copyright (c) 2015-2016 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
@@ -38,6 +39,7 @@
 #define	_MACHINE_DB_MACHDEP_H_
 
 #include <sys/param.h>
+#include <uvm/uvm_extern.h>
 #include <machine/riscvreg.h>
 #include <machine/frame.h>
 #include <machine/trap.h>
@@ -48,46 +50,34 @@
 typedef vaddr_t 	db_addr_t;
 typedef long		db_expr_t;
 
-#define	PC_REGS(regs)	((db_addr_t)(regs)->tf_ra)
-#define	SET_PC_REGS(regs, value) (regs)->tf_ra = (int)(value)
+typedef trapframe_t	db_regs_t;
+
+extern db_regs_t	ddb_regs;
+#define DDB_REGS	(&ddb_regs)
+
+#define	PC_REGS(regs)			((db_addr_t)(regs)->tf_ra)
+#define	SET_PC_REGS(regs, value)	(regs)->tf_ra = (register_t)(value)
 
 #define	BKPT_INST	(KERNEL_BREAKPOINT)
 #define	BKPT_SIZE	(INSN_SIZE)
 #define	BKPT_SET(inst)	(BKPT_INST)
 
-#define	BKPT_SKIP do {				\
-	kdb_frame->tf_sepc += BKPT_SIZE;	\
-} while (0)
-
-#define	db_clear_single_step	kdb_cpu_clear_singlestep
-#define	db_set_single_step	kdb_cpu_set_singlestep
-
-#define	IS_BREAKPOINT_TRAP(type, code)	(type == T_BREAKPOINT)
-#define	IS_WATCHPOINT_TRAP(type, code)	(type == T_WATCHPOINT)
+#define	IS_BREAKPOINT_TRAP(type, code)	((type) == T_BREAKPOINT)
+#define	IS_WATCHPOINT_TRAP(type, code)	((type) == T_WATCHPOINT)
 
 #define	inst_trap_return(ins)	(ins == 0x10000073)	/* eret */
 #define	inst_return(ins)	(ins == 0x00008067)	/* ret */
-#define	inst_call(ins)		(((ins) & 0x7f) == 111 || \
-				 ((ins) & 0x7f) == 103) /* jal, jalr */
+#define	inst_call(ins)		(((ins) & 0x7f) == 0x6f || \
+				 ((ins) & 0x7f) == 0x67)	/* jal, jalr */
+#define	inst_branch(ins)	(((ins) & 0x7f) == 0x63)	/* branch */
 
-#define	inst_load(ins) ({							\
-	uint64_t tmp_instr = db_get_value(PC_REGS(regs), sizeof(uint64_t), FALSE);	\
-	is_load_instr(tmp_instr);						\
-})
-
-#define	inst_store(ins) ({							\
-	uint64_t tmp_instr = db_get_value(PC_REGS(regs), sizeof(uint64_t), FALSE);	\
-	is_store_instr(tmp_instr);						\
-})
-
-#define	is_load_instr(ins)	(((ins) & 0x7f) == 3)
-#define	is_store_instr(ins)	(((ins) & 0x7f) == 35)
-
-#define	next_instr_address(pc, bd)	((bd) ? (pc) : ((pc) + 4)) // INSN_SIZE == 4 ??
+#define	next_instr_address(pc, bd)	((bd) ? (pc) : ((pc) + INSN_SIZE))
 
 #define DB_MACHINE_COMMANDS
 
 #define SOFTWARE_SSTEP
+
+db_addr_t db_branch_taken(u_int inst, db_addr_t pc, db_regs_t *regs);
 
 #define branch_taken(ins, pc, fun, regs) \
 	db_branch_taken((ins), (pc), (regs))
