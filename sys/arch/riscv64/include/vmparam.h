@@ -28,59 +28,77 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ *	@(#)vmparam.h	5.9 (Berkeley) 5/12/91
  */
 
-#ifndef _MACHINE_PARAM_H_
-#define _MACHINE_PARAM_H_
+#ifndef _MACHINE_VMPARAM_H_
+#define _MACHINE_VMPARAM_H_
 
-#ifdef _KERNEL
-#ifndef _LOCORE
-#include <machine/cpu.h>
+/*
+ * Machine dependent constants for riscv64.
+ */
+
+#define	USRSTACK	VM_MAXUSER_ADDRESS
+
+/*
+ * Virtual memory related constants, all in bytes
+ */
+#ifndef MAXTSIZ
+#define	MAXTSIZ	        ((paddr_t)1*1024*1024*1024)	/* max text size */
 #endif
+#ifndef DFLDSIZ
+#define	DFLDSIZ		((paddr_t)128*1024*1024)	/* initial data size limit */
+#endif
+#ifndef MAXDSIZ
+#define	MAXDSIZ		((paddr_t)1*1024*1024*1024)	/* max data size */
+#endif
+#ifndef BRKSIZ
+#define	BRKSIZ		((paddr_t)1*1024*1024*1024)	/* heap gap size */
+#endif
+#ifndef	DFLSSIZ
+#define	DFLSSIZ		((paddr_t)128*1024*1024)	/* initial stack size limit */
+#endif
+#ifndef	MAXSSIZ
+#define	MAXSSIZ		((paddr_t)1*1024*1024*1024)	/* max stack size */
 #endif
 
-#define _MACHINE	riscv64
-#define MACHINE		"riscv64"
-#define _MACHINE_ARC	riscv64
-#define MACHINE_ARCH	"riscv64"
-#define MID_MACHINE	MID_RISCV64
+#define	STACKGAP_RANDOM	256*1024
 
-#define PAGE_SHIFT	12
-#define PAGE_SIZE	(1 << PAGE_SHIFT)
-#define PAGE_MASK	(PAGE_SIZE - 1)
-
-#define KERNBASE	0xffffffc000000000ULL	/* start of kernel virtual space */
-
-#ifdef _KERNEL
-
-#define NBPG		PAGE_SIZE		/* bytes/page */
-#define PGSHIFT		PAGE_SHIFT		/* LOG2(PAGE_SIZE) */
-#define PGOFSET		PAGE_MASK		/* byte offset into page */
-
-#define UPAGES		5			/* XXX pages of u-area */
-#define USPACE		(UPAGES * PAGE_SIZE)	/* XXX total size of u-area */
-#define USPACE_ALIGN	0			/* XXX u-area alignment 0-none */
-
-#define NMBCLUSTERS	(64 * 1024)		/* XXX max cluster allocation */
-
-#ifndef MSGBUFSIZE
-#define MSGBUFSIZE	(16 * PAGE_SIZE)	/* XXX default message buffer size */
+/*
+ * Size of shared memory map
+ */
+#ifndef	SHMMAXPGS
+#define	SHMMAXPGS	1024
 #endif
 
 /*
- * XXX Maximum size of the kernel malloc arena in PAGE_SIZE-sized
- * logical pages.
+ * Size of User Raw I/O map
  */
-#define NKMEMPAGES_MAX_DEFAULT	((128 * 1024 * 1024) >> PAGE_SHIFT)
+#define	USRIOSIZE 	300
 
-#define STACKALIGNBYTES		(16 - 1)
-#define STACKALIGN(p)		((u_long)(p) &~ STACKALIGNBYTES)
+/*
+ * Kernel base
+ */
+#define	KERNEL_BASE	0xffffffc000000000ULL
 
-// XXX Advanced Configuration and Power Interface
-#define __HAVE_ACPI
-// XXX Flattened Device Tree
-#define __HAVE_FDT
+/*
+ * Mach derived constants
+ */
 
-#endif /* _KERNEL */
+/* user/kernel map constants */
+#define	VM_MIN_ADDRESS		((vaddr_t)PAGE_SIZE)
+#define	USER_SPACE_BITS		39
+#define	VM_MAXUSER_ADDRESS	((1ULL << USER_SPACE_BITS) - 0x8000)
+#define	VM_MAX_ADDRESS		VM_MAXUSER_ADDRESS
+#define	VM_MIN_KERNEL_ADDRESS	((vaddr_t)0xffffffc000000000ULL)
+#define	VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xffffffc7ffffffffULL)
 
-#endif /* _MACHINE_PARAM_H_ */
+/* virtual sizes (bytes) for various kernel submaps */
+#define	VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
+
+#define	VM_PHYSSEG_MAX		32
+#define	VM_PHYSSEG_STRAT	VM_PSTRAT_BSEARCH
+#define	VM_PHYSSEG_NOADD	/* can't add RAM after vm_mem_init */
+
+#endif /* _MACHINE_VMPARAM_H_ */
