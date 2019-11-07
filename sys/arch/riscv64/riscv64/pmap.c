@@ -78,43 +78,45 @@ struct pool pmap_pmap_pool;
 struct pool pmap_pted_pool;
 struct pool pmap_vp_pool;
 
+vaddr_t virtual_avail, virtual_end;
+int	pmap_virtual_space_called = 0;
 int pmap_initialized = 0;
 
 // XXX Currently unused, but likely useful when implemented
-// static inline void
-// pmap_lock(struct pmap *pmap)
-// {
-// 	if (pmap != pmap_kernel())
-// 		mtx_enter(&pmap->pm_mtx);
-// }
-// 
-// static inline void
-// pmap_unlock(struct pmap *pmap)
-// {
-// 	if (pmap != pmap_kernel())
-// 		mtx_leave(&pmap->pm_mtx);
-// }
-// 
-// static inline int
-// VP_IDX0(vaddr_t va)
-// {
-// 	return (va >> VP_IDX0_POS) & VP_IDX0_MASK;
-// }
-// 
-// static inline int
-// VP_IDX1(vaddr_t va)
-// {
-// 	return (va >> VP_IDX1_POS) & VP_IDX1_MASK;
-// }
-// 
-// static inline int
-// VP_IDX2(vaddr_t va)
-// {
-// 	return (va >> VP_IDX2_POS) & VP_IDX2_MASK;
-// }
+static inline void
+pmap_lock(struct pmap *pmap)
+{
+	if (pmap != pmap_kernel())
+		mtx_enter(&pmap->pm_mtx);
+}
+
+static inline void
+pmap_unlock(struct pmap *pmap)
+{
+	if (pmap != pmap_kernel())
+		mtx_leave(&pmap->pm_mtx);
+}
+
+static inline int
+VP_IDX0(vaddr_t va)
+{
+	return (va >> VP_IDX0_POS) & VP_IDX0_MASK;
+}
+
+static inline int
+VP_IDX1(vaddr_t va)
+{
+	return (va >> VP_IDX1_POS) & VP_IDX1_MASK;
+}
+
+static inline int
+VP_IDX2(vaddr_t va)
+{
+	return (va >> VP_IDX2_POS) & VP_IDX2_MASK;
+}
 
 struct pte_desc *
-pmap_vp_lookup(pmap_t pm, vaddr_t va, uint64_t **pl3entry)
+pmap_vp_lookup(pmap_t pm, vaddr_t va, uint64_t **pl0entry)
 {
 	UNIMPLEMENTED();
 	return 0;
@@ -203,13 +205,27 @@ pmap_collect(pmap_t pm)
 void
 pmap_zero_page(struct vm_page *pg)
 {
-	UNIMPLEMENTED();
+	paddr_t pa = VM_PAGE_TO_PHYS(pg);
+	vaddr_t va = zero_page + cpu_number() * PAGE_SIZE;
+
+	pmap_kenter_pa(va, pa, PROT_READ|PROT_WRITE);
+	pagezero_cache(va);
+	pmap_kremove_pg(va);
 }
 
 void
 pmap_copy_page(struct vm_page *srcpg, struct vm_page *dstpg)
 {
-	UNIMPLEMENTED();
+	paddr_t srcpa = VM_PAGE_TO_PHYS(srcpg);
+	paddr_t dstpa = VM_PAGE_TO_PHYS(dstpg);
+	vaddr_t srcva = copy_src_page + cpu_number() * PAGE_SIZE;
+	vaddr_t dstva = copy_dst_page + cpu_number() * PAGE_SIZE;
+
+	pmap_kenter_pa(srcva, srcpa, PROT_READ);
+	pmap_kenter_pa(dstva, dstpa, PROT_READ|PROT_WRITE);
+	memcpy((void *)dstva, (void *)srcva, PAGE_SIZE);
+	pmap_kremove_pg(srcva);
+	pmap_kremove_pg(dstva);
 }
 
 pmap_t
@@ -324,15 +340,13 @@ pmap_update(pmap_t pm)
 int
 pmap_is_referenced(struct vm_page *pg)
 {
-	UNIMPLEMENTED();
-	return 0;
+	return ((pg->pg_flags & PG_PMAP_REF) != 0);
 }
 
 int
 pmap_is_modified(struct vm_page *pg)
 {
-	UNIMPLEMENTED();
-	return 0;
+	return ((pg->pg_flags & PG_PMAP_MOD) != 0);
 }
 
 int
@@ -371,7 +385,11 @@ pmap_remove_holes(struct vmspace *vm)
 void
 pmap_virtual_space(vaddr_t *start, vaddr_t *end)
 {
-	UNIMPLEMENTED();
+	*start = virtual_avail;
+	*end = virtual_end;
+
+	/* Prevent further KVA stealing. */
+	pmap_virtual_space_called = 1;
 }
 
 void
