@@ -117,6 +117,8 @@ int pmap_initialized = 0;
 // 	return (va >> VP_IDX2_POS) & VP_IDX2_MASK;
 // }
 
+static inline 
+
 struct pte_desc *
 pmap_vp_lookup(pmap_t pm, vaddr_t va, uint64_t **pl0entry)
 {

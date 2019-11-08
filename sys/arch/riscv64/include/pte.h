@@ -54,4 +54,11 @@
 /* physical page number mask */
 #define PTE_RPGN (((1ULL << 56) - 1) & ~PAGE_MASK)
 
+#ifndef _LOCORE
+
+typedef uint64_t pd_entry_t;
+typedef uint64_t pt_entry_t;
+
+#endif /* !_LOCORE */
+
 #endif /* _RISCV64_PTE_H_ */
