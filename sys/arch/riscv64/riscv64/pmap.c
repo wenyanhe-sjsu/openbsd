@@ -193,7 +193,32 @@ pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot)
 void
 pmap_kremove(vaddr_t va, vsize_t len)
 {
-	UNIMPLEMENTED();
+	for (len >>= PAGE_SHIFT; len > 0; len--; va += PAGE_SIZE) {
+		pmap_kremove_pg(va);
+	}
+}
+
+void
+pmap_kremove_pg(vaddr_t va)
+{
+	pmap_t pm = pmap_kernel();
+	struct pte_desc *pted;
+	int s;
+
+	pmap_vp_lookup(pm, va, NULL);
+	if (pted == NULL) {
+		return;
+	}
+
+	if (!PTED_VALID(pted)) {
+		return; /* page is not mapped */
+	}
+
+	s = splvm();
+
+	pm->pm_stats.resident_count--;
+
+	/* XXX Need to actually remove the pted */
 }
 
 void
