@@ -85,37 +85,37 @@ int	pmap_virtual_space_called = 0;
 int pmap_initialized = 0;
 
 // XXX Currently unused, but likely useful when implemented
-static inline void
-pmap_lock(struct pmap *pmap)
-{
-	if (pmap != pmap_kernel())
-		mtx_enter(&pmap->pm_mtx);
-}
+// static inline void
+// pmap_lock(struct pmap *pmap)
+// {
+// 	if (pmap != pmap_kernel())
+// 		mtx_enter(&pmap->pm_mtx);
+// }
 
-static inline void
-pmap_unlock(struct pmap *pmap)
-{
-	if (pmap != pmap_kernel())
-		mtx_leave(&pmap->pm_mtx);
-}
+// static inline void
+// pmap_unlock(struct pmap *pmap)
+// {
+// 	if (pmap != pmap_kernel())
+// 		mtx_leave(&pmap->pm_mtx);
+// }
 
-static inline int
-VP_IDX0(vaddr_t va)
-{
-	return (va >> VP_IDX0_POS) & VP_IDX0_MASK;
-}
+// static inline int
+// VP_IDX0(vaddr_t va)
+// {
+// 	return (va >> VP_IDX0_POS) & VP_IDX0_MASK;
+// }
 
-static inline int
-VP_IDX1(vaddr_t va)
-{
-	return (va >> VP_IDX1_POS) & VP_IDX1_MASK;
-}
+// static inline int
+// VP_IDX1(vaddr_t va)
+// {
+// 	return (va >> VP_IDX1_POS) & VP_IDX1_MASK;
+// }
 
-static inline int
-VP_IDX2(vaddr_t va)
-{
-	return (va >> VP_IDX2_POS) & VP_IDX2_MASK;
-}
+// static inline int
+// VP_IDX2(vaddr_t va)
+// {
+// 	return (va >> VP_IDX2_POS) & VP_IDX2_MASK;
+// }
 
 struct pte_desc *
 pmap_vp_lookup(pmap_t pm, vaddr_t va, uint64_t **pl0entry)
