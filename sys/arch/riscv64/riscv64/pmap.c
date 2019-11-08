@@ -193,7 +193,7 @@ pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot)
 void
 pmap_kremove(vaddr_t va, vsize_t len)
 {
-	for (len >>= PAGE_SHIFT; len > 0; len--; va += PAGE_SIZE) {
+	for (len >>= PAGE_SHIFT; len > 0; len--, va += PAGE_SIZE) {
 		pmap_kremove_pg(va);
 	}
 }
