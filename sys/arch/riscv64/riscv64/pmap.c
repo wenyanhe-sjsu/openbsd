@@ -68,6 +68,8 @@ struct pmapvp2 {
 CTASSERT(sizeof(struct pmapvp0) == sizeof(struct pmapvp1));
 CTASSERT(sizeof(struct pmapvp0) == sizeof(struct pmapvp2));
 
+void pmap_kremove_pg(vaddr_t va);
+
 vaddr_t vmmap;
 vaddr_t zero_page;
 vaddr_t copy_src_page;
