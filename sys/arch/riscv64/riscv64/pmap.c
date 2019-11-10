@@ -80,8 +80,6 @@ struct pool pmap_pmap_pool;
 struct pool pmap_pted_pool;
 struct pool pmap_vp_pool;
 
-vaddr_t virtual_avail, virtual_end;
-int	pmap_virtual_space_called = 0;
 int pmap_initialized = 0;
 
 // XXX Currently unused, but likely useful when implemented
@@ -228,7 +226,7 @@ pmap_kremove_pg(vaddr_t va)
 void
 pmap_collect(pmap_t pm)
 {
-	UNIMPLEMENTED();
+	// XXX Optional Function
 }
 
 void
@@ -285,8 +283,7 @@ pmap_release(pmap_t pm)
 vaddr_t
 pmap_growkernel(vaddr_t maxkvaddr)
 {
-	UNIMPLEMENTED();
-	return 0;
+	// XXX Optional Function
 }
 
 /*
@@ -363,7 +360,7 @@ pmap_postinit(void)
 void
 pmap_update(pmap_t pm)
 {
-	UNIMPLEMENTED();
+	// XXX Optional Function
 }
 
 int
@@ -396,7 +393,7 @@ void
 pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vaddr_t dst_addr,
 	vsize_t len, vaddr_t src_addr)
 {
-	UNIMPLEMENTED();
+	// XXX Optional Function
 }
 
 void
@@ -414,11 +411,7 @@ pmap_remove_holes(struct vmspace *vm)
 void
 pmap_virtual_space(vaddr_t *start, vaddr_t *end)
 {
-	*start = virtual_avail;
-	*end = virtual_end;
-
-	/* Prevent further KVA stealing. */
-	pmap_virtual_space_called = 1;
+  // XXX Optional Function
 }
 
 void
