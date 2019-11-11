@@ -70,6 +70,8 @@ CTASSERT(sizeof(struct pmapvp0) == sizeof(struct pmapvp2));
 
 void pmap_kremove_pg(vaddr_t va);
 
+void pmap_allocate_asid(pmap_t pm);
+
 vaddr_t vmmap;
 vaddr_t zero_page;
 vaddr_t copy_src_page;
@@ -116,6 +118,28 @@ int pmap_initialized = 0;
 // }
 
 static inline 
+#define NUM_ASID (1 << 16)
+uint64_t pmap_asid[NUM_ASID / 32];
+
+void
+pmap_allocate_asid(pmap_t pm)
+{
+	uint64_t bits;
+	int asid, bit;
+
+	for (;;) {
+		do {
+			asid = arc4random() & (NUM_ASID - 2);
+			bit = (asid & (64 - 1));
+			bits = pmap_asid[asid / 64];
+		} while (asid == 0 || (bits & (3U << bit)));
+
+		if (atomic_cas_uint(&pmap_asid[asid / 64], bits,
+		    bits | (3U << bit)) == bits)
+			break;
+	}
+	pm->pm_asid = asid;
+}
 
 struct pte_desc *
 pmap_vp_lookup(pmap_t pm, vaddr_t va, uint64_t **pl0entry)
