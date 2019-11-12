@@ -68,8 +68,10 @@ struct pmapvp2 {
 CTASSERT(sizeof(struct pmapvp0) == sizeof(struct pmapvp1));
 CTASSERT(sizeof(struct pmapvp0) == sizeof(struct pmapvp2));
 
+void pmap_pinit(pmap_t pm);
 void pmap_kremove_pg(vaddr_t va);
 
+void pmap_reference(pmap_t pm);
 void pmap_allocate_asid(pmap_t pm);
 
 vaddr_t vmmap;
@@ -115,6 +117,21 @@ static inline int
 VP_IDX2(vaddr_t va)
 {
 	return (va >> VP_IDX2_POS) & VP_IDX2_MASK;
+}
+
+void
+pmap_pinit(pmap_t pm)
+{
+	vaddr_t l0va;
+
+	while (pm->pm_vp == NULL) {
+		pm->pm_vp0 = pool_get(&pmap_vp_pool, PR_WAITOK, PR_ZERO);
+		l0va = (vaddr_t)pm->pm_vp0;
+	}
+
+	pmap_extract(pmap_kernel(), l0va, (paddr_t *)&pm->pm_pt0pa);
+	pmap_allocate_asid(pm);
+	pmap_reference(pm);
 }
 
 #define NUM_ASID (1 << 16)
@@ -301,17 +318,30 @@ pmap_copy_page(struct vm_page *srcpg, struct vm_page *dstpg)
 	pmap_kremove_pg(dstva);
 }
 
+int pmap_vp_poolcache = 0; /* force vp poolcache to allocate late */
+
 pmap_t
 pmap_create(void)
 {
-	UNIMPLEMENTED();
-	return 0;
+	pmap_t pmap;
+	pmap = pool_get(&pmap_pmap_pool, PR_WAITOK | PR_ZERO);
+
+	mtx_init(&pmap->pm_mtx, IPL_VM);
+
+	pmap_pinit(pmap);
+	// Conditional below is stolen from arm64 pmap impl.
+	// XXX Why does this happen here? Investigate further.
+	if (pmap_vp_poolcache == 0) {
+		pool_setlowat(&pmap_vp_pool, 20);
+		pmap_vp_poolcache = 20;
+	}
+	return (pmap);
 }
 
 void
 pmap_reference(pmap_t pm)
 {
-	UNIMPLEMENTED();
+	atmoic_inc_int(&pm->pm_refs);
 }
 
 void
