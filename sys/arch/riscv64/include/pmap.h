@@ -94,8 +94,6 @@ paddr_t pmap_steal_avail(size_t size, int align, void **kva);
 void pmap_avail_fixup();
 void pmap_physload_avail();
 
-#define PMAP_GROWKERNEL
-
 struct pv_entry;
 
 /* investigate */
