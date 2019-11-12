@@ -124,12 +124,12 @@ pmap_pinit(pmap_t pm)
 {
 	vaddr_t l0va;
 
-	while (pm->pm_vp == NULL) {
-		pm->pm_vp0 = pool_get(&pmap_vp_pool, PR_WAITOK, PR_ZERO);
+	while (pm->pm_vp0 == NULL) {
+		pm->pm_vp0 = pool_get(&pmap_vp_pool, PR_WAITOK | PR_ZERO);
 		l0va = (vaddr_t)pm->pm_vp0;
 	}
 
-	pmap_extract(pmap_kernel(), l0va, (paddr_t *)&pm->pm_pt0pa);
+	pmap_extract(pmap_kernel(), l0va, (paddr_t *)&pm->pm_pa0);
 	pmap_allocate_asid(pm);
 	pmap_reference(pm);
 }
@@ -341,7 +341,7 @@ pmap_create(void)
 void
 pmap_reference(pmap_t pm)
 {
-	atmoic_inc_int(&pm->pm_refs);
+	atomic_inc_int(&pm->pm_refs);
 }
 
 void
