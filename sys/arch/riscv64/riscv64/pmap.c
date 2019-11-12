@@ -326,12 +326,6 @@ pmap_release(pmap_t pm)
 	UNIMPLEMENTED();
 }
 
-vaddr_t
-pmap_growkernel(vaddr_t maxkvaddr)
-{
-	// XXX Optional Function
-}
-
 /*
  * Initialize pmap setup.
  * ALL of the code which deals with avail needs rewritten as an actual
