@@ -59,7 +59,7 @@ typedef struct pmap *pmap_t;
 struct pmap {
 	struct mutex pm_mtx;
 	struct pmapvp0 *pm_vp0;
-	uint64_t pm_pa;
+	uint64_t pm_pa0;
 	int pm_privileged;
 	int pm_asid;
 	int pm_refs;				/* ref count */
