@@ -133,7 +133,7 @@ pmap_allocate_asid(pmap_t pm)
 			bits = pmap_asid[asid / 64];
 		} while (asid == 0 || (bits & (3U << bit)));
 
-		if (atomic_cas_uint(&pmap_asid[asid / 64], bits,
+		if (atomic_cas_ulong(&pmap_asid[asid / 64], bits,
 		    bits | (3U << bit)) == bits)
 			break;
 	}
