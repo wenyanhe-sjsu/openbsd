@@ -99,23 +99,23 @@ int pmap_initialized = 0;
 // 		mtx_leave(&pmap->pm_mtx);
 // }
 
-// static inline int
-// VP_IDX0(vaddr_t va)
-// {
-// 	return (va >> VP_IDX0_POS) & VP_IDX0_MASK;
-// }
+static inline int
+VP_IDX0(vaddr_t va)
+{
+	return (va >> VP_IDX0_POS) & VP_IDX0_MASK;
+}
 
-// static inline int
-// VP_IDX1(vaddr_t va)
-// {
-// 	return (va >> VP_IDX1_POS) & VP_IDX1_MASK;
-// }
+static inline int
+VP_IDX1(vaddr_t va)
+{
+	return (va >> VP_IDX1_POS) & VP_IDX1_MASK;
+}
 
-// static inline int
-// VP_IDX2(vaddr_t va)
-// {
-// 	return (va >> VP_IDX2_POS) & VP_IDX2_MASK;
-// }
+static inline int
+VP_IDX2(vaddr_t va)
+{
+	return (va >> VP_IDX2_POS) & VP_IDX2_MASK;
+}
 
 static inline 
 #define NUM_ASID (1 << 16)
@@ -142,10 +142,33 @@ pmap_allocate_asid(pmap_t pm)
 }
 
 struct pte_desc *
-pmap_vp_lookup(pmap_t pm, vaddr_t va, uint64_t **pl0entry)
+pmap_vp_lookup(pmap_t pm, vaddr_t va, uint64_t **pl2entry)
 {
-	UNIMPLEMENTED();
-	return 0;
+	struct pmapvp0 *vp0;
+	struct pmapvp1 *vp1;
+	struct pmapvp2 *vp2;
+	struct pte_desc *pted;
+
+	vp0 = pm.pm_vp0;
+	if (vp0 == NULL) {
+		return NULL;
+	}
+
+	vp1 = vp0->vp[VP_IDX0(va)];
+	if (vp1 == NULL) {
+		return NULL;
+	}
+
+	vp2 = vp1->vp[VP_IDX1(va)];
+	if (vp2 == NULL) {
+		return NULL;
+	}
+
+	pted = vp2->vp[VP_IDX2(va)];
+	if (pl2entry != NULL)
+		*pl2entry = &(vp2->l2[VP_IDX2(va)]);
+
+	return pted;
 }
 
 struct pte_desc *
