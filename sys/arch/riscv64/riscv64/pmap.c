@@ -148,7 +148,7 @@ pmap_vp_lookup(pmap_t pm, vaddr_t va, uint64_t **pl2entry)
 	struct pmapvp2 *vp2;
 	struct pte_desc *pted;
 
-	vp0 = pm.pm_vp0;
+	vp0 = pm->pm_vp0;
 	if (vp0 == NULL) {
 		return NULL;
 	}
