@@ -52,17 +52,17 @@ struct pte_desc {
 
 struct pmapvp0 {
 	uint64_t l0[VP_IDX0_CNT];
-	struct pte_desc *vp[VP_IDX0_CNT];
+	struct pmapvp1 *vp[VP_IDX0_CNT];
 };
 
 struct pmapvp1 {
 	uint64_t l1[VP_IDX1_CNT];
-	struct pmapvp0 *vp[VP_IDX1_CNT];
+	struct pmapvp2 *vp[VP_IDX1_CNT];
 };
 
 struct pmapvp2 {
 	uint64_t l2[VP_IDX2_CNT];
-	struct pmapvp1 *vp[VP_IDX2_CNT];
+	struct pte_desc *vp[VP_IDX2_CNT];
 };
 
 CTASSERT(sizeof(struct pmapvp0) == sizeof(struct pmapvp1));
