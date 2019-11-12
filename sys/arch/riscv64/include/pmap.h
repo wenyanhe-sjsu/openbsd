@@ -28,13 +28,13 @@
 // XXX Only targeting compatibility with SV39
 #define VP_IDX0_CNT	512
 #define VP_IDX0_MASK	(VP_IDX0_CNT-1)
-#define VP_IDX0_POS	12
+#define VP_IDX0_POS	30
 #define VP_IDX1_CNT	512
 #define VP_IDX1_MASK	(VP_IDX1_CNT-1)
 #define VP_IDX1_POS	21
 #define VP_IDX2_CNT	512
 #define VP_IDX2_MASK	(VP_IDX2_CNT-1)
-#define VP_IDX2_POS	30
+#define VP_IDX2_POS	12
 
 /* cache flags */
 // XXX These are duplicated from arm64 and may need some reworking
@@ -58,7 +58,7 @@ typedef struct pmap *pmap_t;
 
 struct pmap {
 	struct mutex pm_mtx;
-	struct pmapvp2 *pm_vp;	/* SV39 */
+	struct pmapvp0 *pm_vp0;
 	uint64_t pm_pa;
 	int pm_privileged;
 	int pm_asid;
