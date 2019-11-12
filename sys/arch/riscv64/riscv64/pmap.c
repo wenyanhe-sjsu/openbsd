@@ -333,33 +333,6 @@ pmap_release(pmap_t pm)
  */
 CTASSERT(sizeof(struct pmapvp0) == 2 * PAGE_SIZE);
 
-vaddr_t
-pmap_bootstrap(long kvo, paddr_t lpt1, long kernelstart, long kernelend,
-    long ram_start, long ram_end)
-{
-	UNIMPLEMENTED();
-	return 0;
-}
-
-void
-pmap_activate(struct proc *p)
-{
-	UNIMPLEMENTED();
-}
-
-void
-pmap_deactivate(struct proc *p)
-{
-	UNIMPLEMENTED();
-}
-
-boolean_t
-pmap_extract(pmap_t pm, vaddr_t va, paddr_t *pa)
-{
-	UNIMPLEMENTED();
-	return 0;
-}
-
 void
 pmap_page_protect(struct vm_page *pg, vm_prot_t prot)
 {
@@ -374,25 +347,6 @@ pmap_protect(pmap_t pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 
 void
 pmap_init(void)
-{
-	UNIMPLEMENTED();
-}
-
-void
-pmap_proc_iflush(struct process *pr, vaddr_t va, vsize_t len)
-{
-	UNIMPLEMENTED();
-}
-
-int
-pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, int user)
-{
-	UNIMPLEMENTED();
-	return 0;
-}
-
-void
-pmap_postinit(void)
 {
 	UNIMPLEMENTED();
 }
@@ -443,38 +397,7 @@ pmap_unwire(pmap_t pm, vaddr_t va)
 }
 
 void
-pmap_remove_holes(struct vmspace *vm)
-{
-	UNIMPLEMENTED();
-}
-
-void
 pmap_virtual_space(vaddr_t *start, vaddr_t *end)
 {
   // XXX Optional Function
-}
-
-void
-pmap_avail_fixup(void)
-{
-	UNIMPLEMENTED();
-}
-
-paddr_t
-pmap_steal_avail(size_t size, int align, void **kva)
-{
-	UNIMPLEMENTED();
-	return 0;
-}
-
-void
-pmap_physload_avail(void)
-{
-	UNIMPLEMENTED();
-}
-
-void
-pmap_map_early(paddr_t spa, psize_t len)
-{
-	UNIMPLEMENTED();
 }
