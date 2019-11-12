@@ -118,22 +118,22 @@ VP_IDX2(vaddr_t va)
 }
 
 #define NUM_ASID (1 << 16)
-uint64_t pmap_asid[NUM_ASID / 32];
+uint32_t pmap_asid[NUM_ASID / 32];
 
 void
 pmap_allocate_asid(pmap_t pm)
 {
-	uint64_t bits;
+	uint32_t bits;
 	int asid, bit;
 
 	for (;;) {
 		do {
 			asid = arc4random() & (NUM_ASID - 2);
-			bit = (asid & (64 - 1));
-			bits = pmap_asid[asid / 64];
+			bit = (asid & (32 - 1));
+			bits = pmap_asid[asid / 32];
 		} while (asid == 0 || (bits & (3U << bit)));
 
-		if (atomic_cas_ulong(&pmap_asid[asid / 64], bits,
+		if (atomic_cas_ulong(&pmap_asid[asid / 32], bits,
 		    bits | (3U << bit)) == bits)
 			break;
 	}
