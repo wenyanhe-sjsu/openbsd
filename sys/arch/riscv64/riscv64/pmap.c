@@ -117,7 +117,6 @@ VP_IDX2(vaddr_t va)
 	return (va >> VP_IDX2_POS) & VP_IDX2_MASK;
 }
 
-static inline 
 #define NUM_ASID (1 << 16)
 uint64_t pmap_asid[NUM_ASID / 32];
 
