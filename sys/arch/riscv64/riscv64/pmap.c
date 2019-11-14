@@ -162,17 +162,11 @@ pmap_allocate_asid(pmap_t pm)
 struct pte_desc *
 pmap_vp_lookup(pmap_t pm, vaddr_t va, uint64_t **pl2entry)
 {
-	struct pmapvp0 *vp0;
 	struct pmapvp1 *vp1;
 	struct pmapvp2 *vp2;
 	struct pte_desc *pted;
 
-	vp0 = pm->pm_vp0;
-	if (vp0 == NULL) {
-		return NULL;
-	}
-
-	vp1 = vp0->vp[VP_IDX0(va)];
+	vp1 = pm->pm_vp0->vp[VP_IDX0(va)];
 	if (vp1 == NULL) {
 		return NULL;
 	}
@@ -192,8 +186,24 @@ pmap_vp_lookup(pmap_t pm, vaddr_t va, uint64_t **pl2entry)
 struct pte_desc *
 pmap_vp_remove(pmap_t pm, vaddr_t va)
 {
-	UNIMPLEMENTED();
-	return 0;
+	struct pmapvp1 *vp1;
+	struct pmapvp2 *vp2;
+	struct pte_desc *pted;
+
+	vp1 = pm->pm_vp0->vp[VP_IDX0(va)];
+	if (vp1 == NULL) {
+		return NULL;
+	}
+
+	vp2 = vp1->vp[VP_IDX1(va)];
+	if (vp2 == NULL) {
+		return NULL;
+	}
+
+	pted = vp2->vp[VP_IDX2(va)];
+	vp2->vp[VP_IDX2(va)] = NULL;
+
+	return pted;
 }
 
 int
