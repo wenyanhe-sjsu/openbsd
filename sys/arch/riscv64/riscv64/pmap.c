@@ -209,12 +209,10 @@ pmap_vp_remove(pmap_t pm, vaddr_t va)
 int
 pmap_vp_enter(pmap_t pm, vaddr_t va, struct pte_desc *pted, int flags)
 {
-	struct pmapvp0 *vp0;
 	struct pmapvp1 *vp1;
 	struct pmapvp2 *vp2;
 
-	vp0 = pm->pm_vp0;
-	vp1 = vp0->vp[VP_IDX0(va)];
+	vp1 = pm->pm_vp0->vp[VP_IDX0(va)];
 	if (vp1 == NULL) {
 		vp1 = pool_get(&pmap_vp_pool, PR_NOWAIT | PR_ZERO);
 		if (vp1 == NULL) {
