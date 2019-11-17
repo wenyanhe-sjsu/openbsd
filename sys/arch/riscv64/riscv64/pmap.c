@@ -69,9 +69,15 @@ CTASSERT(sizeof(struct pmapvp0) == sizeof(struct pmapvp1));
 CTASSERT(sizeof(struct pmapvp0) == sizeof(struct pmapvp2));
 
 void pmap_pinit(pmap_t pm);
+void pmap_remove_pted(pmap_t pm, struct pte_desc *pted);
 void pmap_kremove_pg(vaddr_t va);
 void pmap_set_l1(struct pmap *, uint64_t, struct pmapvp1 *);
 void pmap_set_l2(struct pmap *, uint64_t, struct pmapvp1 *, struct pmapvp2 *);
+
+void pmap_fill_pte(pmap_t pm, vaddr_t va, paddr_t pa, struct pte_desc *pted, vm_prot_t prot, int flags, int cache);
+void pmap_pte_insert(struct pte_desc *pted);
+
+void pmap_enter_pv(struct pte_desc *pted, struct vm_page *);
 
 void pmap_reference(pmap_t pm);
 void pmap_allocate_asid(pmap_t pm);
@@ -88,20 +94,19 @@ struct pool pmap_vp_pool;
 
 int pmap_initialized = 0;
 
-// XXX Currently unused, but likely useful when implemented
-// static inline void
-// pmap_lock(struct pmap *pmap)
-// {
-// 	if (pmap != pmap_kernel())
-// 		mtx_enter(&pmap->pm_mtx);
-// }
+static inline void
+pmap_lock(struct pmap *pmap)
+{
+	if (pmap != pmap_kernel())
+		mtx_enter(&pmap->pm_mtx);
+}
 
-// static inline void
-// pmap_unlock(struct pmap *pmap)
-// {
-// 	if (pmap != pmap_kernel())
-// 		mtx_leave(&pmap->pm_mtx);
-// }
+static inline void
+pmap_unlock(struct pmap *pmap)
+{
+	if (pmap != pmap_kernel())
+		mtx_leave(&pmap->pm_mtx);
+}
 
 static inline int
 VP_IDX0(vaddr_t va)
@@ -276,8 +281,91 @@ PTED_VALID(struct pte_desc *pted)
 int
 pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, int flags)
 {
-	UNIMPLEMENTED();
-	return 0;
+	struct pte_desc *pted;
+	struct vm_page *pg;
+	int error;
+	int cache = PMAP_CACHE_WB;
+	int need_sync = 0;
+
+	if (pa & PMAP_NOCACHE)
+		cache = PMAP_CACHE_CI;
+	if (pa & PMAP_DEVICE)
+		cache = PMAP_CACHE_DEV;
+	pg = PHYS_TO_VM_PAGE(pa);
+
+	pmap_lock(pm);
+	pted = pmap_vp_lookup(pm, va, NULL);
+	if (pted && PTED_VALID(pted)) {
+		pmap_remove_pted(pm, pted);
+		/* we lost our pted if it was user */
+		if (pm != pmap_kernel())
+			pted = pmap_vp_lookup(pm, va, NULL);
+	}
+
+	pm->pm_stats.resident_count++;
+
+	/* Do not have pted for this, get one and put it in VP */
+	if (pted == NULL) {
+		pted = pool_get(&pmap_pted_pool, PR_NOWAIT | PR_ZERO);
+		if (pted == NULL) {
+			if ((flags & PMAP_CANFAIL) == 0)
+				panic("%s: failed to allocate pted", __func__);
+			error = ENOMEM;
+			goto out;
+		}
+		if (pmap_vp_enter(pm, va, pted, flags)) {
+			if ((flags & PMAP_CANFAIL) == 0)
+				panic("%s: failed to allocate L2/L3", __func__);
+			error = ENOMEM;
+			pool_put(&pmap_pted_pool, pted);
+			goto out;
+		}
+	}
+
+	/*
+	 * If it should be enabled _right now_, we can skip doing ref/mod
+	 * emulation. Any access includes reference, modified only by write.
+	 */
+	if (pg != NULL &&
+	    ((flags & PROT_MASK) || (pg->pg_flags & PG_PMAP_REF))) {
+		atomic_setbits_int(&pg->pg_flags, PG_PMAP_REF);
+		if ((prot & PROT_WRITE) && (flags & PROT_WRITE)) {
+			atomic_setbits_int(&pg->pg_flags, PG_PMAP_MOD);
+			atomic_clearbits_int(&pg->pg_flags, PG_PMAP_EXE);
+		}
+	}
+
+	pmap_fill_pte(pm, va, pa, pted, prot, flags, cache);
+
+	if (pg != NULL) {
+		pmap_enter_pv(pted, pg); /* only managed mem */
+	}
+
+	/*
+	 * Insert into table, if this mapping said it needed to be mapped
+	 * now.
+	 */
+	if (flags & (PROT_READ|PROT_WRITE|PROT_EXEC|PMAP_WIRED)) {
+		pmap_pte_insert(pted);
+	}
+
+	// XXX Do a TLB Flush
+	// ttlb_flush(pm, va & ~PAGE_MASK);
+
+	if (pg != NULL && (flags & PROT_EXEC)) {
+		need_sync = ((pg->pg_flags & PG_PMAP_EXE) == 0);
+		atomic_setbits_int(&pg->pg_flags, PG_PMAP_EXE);
+	}
+
+	// XXX Sync Instruction Cache
+	// if (need_sync && (pm == pmap_kernel() || (curproc &&
+	//     curproc->p_vmspace->vm_map.pmap == pm)))
+	// 	cpu_icache_sync_range(va & ~PAGE_MASK, PAGE_SIZE);
+
+	error = 0;
+out:
+	pmap_unlock(pm);
+	return error;
 }
 
 void
