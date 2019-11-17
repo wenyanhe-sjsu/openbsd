@@ -68,7 +68,6 @@ struct pmapvp2 {
 CTASSERT(sizeof(struct pmapvp0) == sizeof(struct pmapvp1));
 CTASSERT(sizeof(struct pmapvp0) == sizeof(struct pmapvp2));
 
-void pmap_pinit(pmap_t pm);
 void pmap_remove_pted(pmap_t pm, struct pte_desc *pted);
 void pmap_kremove_pg(vaddr_t va);
 void pmap_set_l1(struct pmap *, uint64_t, struct pmapvp1 *);
@@ -76,8 +75,11 @@ void pmap_set_l2(struct pmap *, uint64_t, struct pmapvp1 *, struct pmapvp2 *);
 
 void pmap_fill_pte(pmap_t pm, vaddr_t va, paddr_t pa, struct pte_desc *pted, vm_prot_t prot, int flags, int cache);
 void pmap_pte_insert(struct pte_desc *pted);
+void pmap_pte_remove(struct pte_desc *pted, int remove_pted);
+void pmap_pinit(pmap_t pm);
 
 void pmap_enter_pv(struct pte_desc *pted, struct vm_page *);
+void pmap_remove_pv(struct pte_desc *pted);
 
 void pmap_reference(pmap_t pm);
 void pmap_allocate_asid(pmap_t pm);
@@ -372,6 +374,35 @@ void
 pmap_remove(pmap_t pm, vaddr_t sva, vaddr_t eva)
 {
 	UNIMPLEMENTED();
+}
+
+void
+pmap_remove_pted(pmap_t pm, struct pte_desc *pted)
+{
+	pm->pm_stats.resident_count--;
+
+	if (pted->pted_va & PTED_VA_WIRED_M) {
+		pm->pm_stats.wired_count--;
+		pted->pted_va &= ~PTED_VA_WIRED_M;
+	}
+
+	pmap_pte_remove(pted, pm != pmap_kernel());
+
+	// XXX TLB Flush
+	// ttlb_flush(pm, pted->pted_va & ~PAGE_MASK);
+
+	if (pted->pted_va & PTED_VA_EXEC_M) {
+		pted->pted_va &= ~PTED_VA_EXEC_M;
+	}
+
+	if (PTED_MANAGED(pted))
+		pmap_remove_pv(pted);
+
+	pted->pted_pte = 0;
+	pted->pted_va = 0;
+
+	if (pm != pmap_kernel())
+		pool_put(&pmap_pted_pool, pted);
 }
 
 void
