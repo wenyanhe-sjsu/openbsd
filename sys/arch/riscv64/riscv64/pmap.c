@@ -443,6 +443,38 @@ pmap_kremove_pg(vaddr_t va)
 }
 
 void
+pmap_fill_pte(pmap_t pm, vaddr_t va, paddr_t pa, struct pte_desc *pted,
+    vm_prot_t prot, int flags, int cache)
+{
+	pted->pted_va = va;
+	pted->pted_pmap = pm;
+
+	switch (cache) {
+	case PMAP_CACHE_WB:
+		break;
+	case PMAP_CACHE_WT:
+		break;
+	case PMAP_CACHE_CI:
+		break;
+	case PMAP_CACHE_DEV:
+		break;
+	default:
+		panic("pmap_fill_pte:invalid cache mode");
+	}
+	pted->pted_va |= cache;
+
+	pted->pted_va |= prot & (PROT_READ|PROT_WRITE|PROT_EXEC);
+
+	if (flags & PMAP_WIRED) {
+		pted->pted_va |= PTED_VA_WIRED_M;
+		pm->pm_stats.wired_count++;
+	}
+
+	pted->pted_pte = pa & PTE_RPGN;
+	pted->pted_pte |= flags & (PROT_READ|PROT_WRITE|PROT_EXEC);
+}
+
+void
 pmap_collect(pmap_t pm)
 {
 	// XXX Optional Function
