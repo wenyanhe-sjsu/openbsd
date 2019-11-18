@@ -77,12 +77,14 @@ void pmap_fill_pte(pmap_t pm, vaddr_t va, paddr_t pa, struct pte_desc *pted, vm_
 void pmap_pte_insert(struct pte_desc *pted);
 void pmap_pte_remove(struct pte_desc *pted, int remove_pted);
 void pmap_pinit(pmap_t pm);
+void pmap_release(pmap_t pm);
 
 void pmap_enter_pv(struct pte_desc *pted, struct vm_page *);
 void pmap_remove_pv(struct pte_desc *pted);
 
 void pmap_reference(pmap_t pm);
 void pmap_allocate_asid(pmap_t pm);
+void pmap_free_asid(pmap_t pm);
 
 vaddr_t vmmap;
 vaddr_t zero_page;
@@ -164,6 +166,26 @@ pmap_allocate_asid(pmap_t pm)
 			break;
 	}
 	pm->pm_asid = asid;
+}
+
+void
+pmap_free_asid(pmap_t pm)
+{
+	uint32_t bits;
+	int bit;
+
+	KASSERT(pm != curcpu()->ci_curpm);
+	// XXX TLB Flush?
+	// cpu_tlb_flush_asid_all((uint64_t)pm->pm_asid << 48);
+	// cpu_tlb_flush_asid_all((uint64_t)(pm->pm_asid | ASID_USER) << 48);
+
+	bit = (pm->pm_asid & (32 - 1));
+	for (;;) {
+		bits = pmap_asid[pm->pm_asid / 32];
+		if (atomic_cas_uint(&pmap_asid[pm->pm_asid / 32], bits,
+		    bits & ~(3U << bit)) == bits)
+			break;
+	}
 }
 
 struct pte_desc *
@@ -535,7 +557,18 @@ pmap_reference(pmap_t pm)
 void
 pmap_destroy(pmap_t pm)
 {
-	UNIMPLEMENTED();
+	int refs;
+
+	refs = atomic_dec_int_nv(&pm->pm_refs);
+	if (refs > 0)
+		return;
+
+	/*
+	 * reference count is zero, free pmap resources and free pmap.
+	 */
+	pmap_release(pm);
+	pmap_free_asid(pm);
+	pool_put(&pmap_pmap_pool, pm);
 }
 
 void
