@@ -395,8 +395,25 @@ out:
 void
 pmap_remove(pmap_t pm, vaddr_t sva, vaddr_t eva)
 {
-	// XXX Required Function
-	UNIMPLEMENTED();
+	struct pte_desc *pted;
+	vaddr_t va;
+
+	pmap_lock(pm);
+	for (va = sva; va < eva; va += PAGE_SIZE) {
+		pted = pmap_vp_lookup(pm, va, NULL);
+
+		if (pted == NULL)
+			continue;
+
+		if (pted->pted_va & PTED_VA_WIRED_M) {
+			pm->pm_stats.wired_count--;
+			pted->pted_va &= ~PTED_VA_WIRED_M;
+		}
+
+		if (PTED_VALID(pted))
+			pmap_remove_pted(pm, pted);
+	}
+	pmap_unlock(pm);
 }
 
 void
