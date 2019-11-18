@@ -395,6 +395,7 @@ out:
 void
 pmap_remove(pmap_t pm, vaddr_t sva, vaddr_t eva)
 {
+	// XXX Required Function
 	UNIMPLEMENTED();
 }
 
@@ -430,6 +431,7 @@ pmap_remove_pted(pmap_t pm, struct pte_desc *pted)
 void
 pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot)
 {
+	// XXX Required Function
 	UNIMPLEMENTED();
 }
 
@@ -587,18 +589,21 @@ CTASSERT(sizeof(struct pmapvp0) == 2 * PAGE_SIZE);
 void
 pmap_page_protect(struct vm_page *pg, vm_prot_t prot)
 {
+	// XXX Required Function
 	UNIMPLEMENTED();
 }
 
 void
 pmap_protect(pmap_t pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 {
+	// XXX Required Function
 	UNIMPLEMENTED();
 }
 
 void
 pmap_init(void)
 {
+	// XXX Required Function
 	UNIMPLEMENTED();
 }
 
@@ -623,6 +628,7 @@ pmap_is_modified(struct vm_page *pg)
 int
 pmap_clear_modify(struct vm_page *pg)
 {
+	// XXX Required Function
 	UNIMPLEMENTED();
 	return 0;
 }
@@ -630,6 +636,7 @@ pmap_clear_modify(struct vm_page *pg)
 int
 pmap_clear_reference(struct vm_page *pg)
 {
+	// XXX Required Function
 	UNIMPLEMENTED();
 	return 0;
 }
@@ -644,11 +651,12 @@ pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vaddr_t dst_addr,
 void
 pmap_unwire(pmap_t pm, vaddr_t va)
 {
+	// XXX Required Function
 	UNIMPLEMENTED();
 }
 
 void
 pmap_virtual_space(vaddr_t *start, vaddr_t *end)
 {
-  // XXX Optional Function
+	// XXX Optional Function
 }
