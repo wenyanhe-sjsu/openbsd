@@ -653,8 +653,19 @@ pmap_clear_modify(struct vm_page *pg)
 int
 pmap_clear_reference(struct vm_page *pg)
 {
-	// XXX Required Function
-	UNIMPLEMENTED();
+	struct pte_desc *pted;
+
+	atomic_clearbits_int(&pg->pg_flags, PG_PMAP_REF);
+
+	mtx_enter(&pg->mdpage.pv_mtx);
+	LIST_FOREACH(pted, &(pg->mdpage.pv_list), pted_pv_list) {
+		pted->pted_pte &= ~PROT_MASK;
+		pmap_pte_insert(pted);
+		// TLB Flush?
+		// ttlb_flush(pted->pted_pmap, pted->pted_va & ~PAGE_MASK);
+	}
+	mtx_leave(&pg->mdpage.pv_mtx);
+
 	return 0;
 }
 
