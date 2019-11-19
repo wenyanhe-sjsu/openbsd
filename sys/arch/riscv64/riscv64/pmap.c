@@ -679,8 +679,13 @@ pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vaddr_t dst_addr,
 void
 pmap_unwire(pmap_t pm, vaddr_t va)
 {
-	// XXX Required Function
-	UNIMPLEMENTED();
+	struct pte_desc *pted;
+
+	pted = pmap_vp_lookup(pm, va, NULL);
+	if ((pted != NULL) && (pted->pted_va & PTED_VA_WIRED_M)) {
+		pm->pm_stats.wired_count--;
+		pted->pted_va &= ~PTED_VA_WIRED_M;
+	}
 }
 
 void
