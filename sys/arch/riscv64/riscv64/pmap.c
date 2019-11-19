@@ -68,6 +68,13 @@ struct pmapvp2 {
 CTASSERT(sizeof(struct pmapvp0) == sizeof(struct pmapvp1));
 CTASSERT(sizeof(struct pmapvp0) == sizeof(struct pmapvp2));
 
+void *pmap_vp_page_alloc(struct pool *, int, int *);
+void pmap_vp_page_free(struct pool *, void *);
+
+struct pool_allocator pmap_vp_allocator = {
+	pmap_vp_page_alloc, pmap_vp_page_free, sizeof(struct pmapvp0)
+};
+
 void pmap_remove_pted(pmap_t pm, struct pte_desc *pted);
 void pmap_kremove_pg(vaddr_t va);
 void pmap_set_l1(struct pmap *, uint64_t, struct pmapvp1 *);
@@ -270,14 +277,19 @@ pmap_vp_enter(pmap_t pm, vaddr_t va, struct pte_desc *pted, int flags)
 void *
 pmap_vp_page_alloc(struct pool *pp, int flags, int *slowdown)
 {
-	UNIMPLEMENTED();
-	return 0;
+	struct kmem_dyn_mode kd = KMEM_DYN_INITIALIZER;
+
+	kd.kd_waitok = ISSET(flags, PR_WAITOK);
+	kd.kd_trylock = ISSET(flags, PR_NOWAIT);
+	kd.kd_slowdown = slowdown;
+
+	return km_alloc(pp->pr_pgsize, &kv_any, &kp_dirty, &kd);
 }
 
 void
 pmap_vp_page_free(struct pool *pp, void *v)
 {
-	UNIMPLEMENTED();
+	km_free(v, pp->pr_pgsize, &kv_any, &kp_dirty);
 }
 
 u_int32_t PTED_MANAGED(struct pte_desc *pted);
@@ -620,8 +632,16 @@ pmap_protect(pmap_t pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 void
 pmap_init(void)
 {
-	// XXX Required Function
-	UNIMPLEMENTED();
+	// XXX Rewrite SATP CSR to set MODE, ASID, PPN?
+
+	pool_init(&pmap_pmap_pool, sizeof(struct pmap), 0, IPL_NONE, 0,
+	    "pmap", NULL);
+	pool_setlowat(&pmap_pmap_pool, 2);
+	pool_init(&pmap_pted_pool, sizeof(struct pte_desc), 0, IPL_VM, 0,
+	    "pted", NULL);
+	pool_setlowat(&pmap_pted_pool, 20);
+	pool_init(&pmap_vp_pool, sizeof(struct pmapvp0), PAGE_SIZE, IPL_VM, 0,
+	    "vp", &pmap_vp_allocator);
 }
 
 void
