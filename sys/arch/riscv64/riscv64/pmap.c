@@ -75,6 +75,8 @@ struct pool_allocator pmap_vp_allocator = {
 	pmap_vp_page_alloc, pmap_vp_page_free, sizeof(struct pmapvp0)
 };
 
+void pmap_kenter_pa_internal(vaddr_t va, paddr_t pa, vm_prot_t prot, int flags, int cache);
+
 void pmap_remove_pted(pmap_t pm, struct pte_desc *pted);
 void pmap_kremove_pg(vaddr_t va);
 void pmap_set_l1(struct pmap *, uint64_t, struct pmapvp1 *);
@@ -463,8 +465,46 @@ pmap_remove_pted(pmap_t pm, struct pte_desc *pted)
 void
 pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot)
 {
-	// XXX Required Function
-	UNIMPLEMENTED();
+	pmap_kenter_pa_internal(va, pa, prot, prot,
+	    (pa & PMAP_NOCACHE) ? PMAP_CACHE_CI : PMAP_CACHE_WB);
+}
+
+
+void
+pmap_kenter_pa_internal(vaddr_t va, paddr_t pa, vm_prot_t prot, int flags, int cache)
+{
+	pmap_t pm = pmap_kernel();
+	struct pte_desc *pted;
+
+	pted = pmap_vp_lookup(pm, va, NULL);
+
+	/* Do not have pted for this, get one and put it in VP */
+	if (pted == NULL) {
+		panic("pted not preallocated in pmap_kernel() va %lx pa %lx\n",
+		    va, pa);
+	}
+
+	if (pted && PTED_VALID(pted))
+		pmap_kremove_pg(va); /* pted is reused */
+
+	pm->pm_stats.resident_count++;
+
+	flags |= PMAP_WIRED; /* kernel mappings are always wired. */
+	/* Calculate PTE */
+	pmap_fill_pte(pm, va, pa, pted, prot, flags, cache);
+
+	/*
+	 * Insert into table
+	 * We were told to map the page, probably called from vm_fault,
+	 * so map the page!
+	 */
+	pmap_pte_insert(pted);
+
+	// XXX TLB Flush?
+	// ttlb_flush(pm, va & ~PAGE_MASK);
+	// XXX Writeback Invalidate? Investigate further...
+	// if (cache == PMAP_CACHE_CI || cache == PMAP_CACHE_DEV)
+	// 	cpu_idcache_wbinv_range(va & ~PAGE_MASK, PAGE_SIZE);
 }
 
 void
