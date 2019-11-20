@@ -791,8 +791,24 @@ pmap_is_modified(struct vm_page *pg)
 int
 pmap_clear_modify(struct vm_page *pg)
 {
-	// XXX Required Function
-	UNIMPLEMENTED();
+	struct pte_desc *pted;
+	uint64_t *pl3 = NULL;
+
+	atomic_clearbits_int(&pg->pg_flags, PG_PMAP_MOD);
+
+	mtx_enter(&pg->mdpage.pv_mtx);
+	LIST_FOREACH(pted, &(pg->mdpage.pv_list), pted_pv_list) {
+		if (pmap_vp_lookup(pted->pted_pmap, pted->pted_va & ~PAGE_MASK, &pl3) == NULL)
+			panic("failed to look up pte\n");
+		// XXX What is this about?
+		// *pl3  |= ATTR_AP(2);
+		pted->pted_pte &= ~PROT_WRITE;
+
+		// TLB Flush?
+		// ttlb_flush(pted->pted_pmap, pted->pted_va & ~PAGE_MASK);
+	}
+	mtx_leave(&pg->mdpage.pv_mtx);
+
 	return 0;
 }
 
