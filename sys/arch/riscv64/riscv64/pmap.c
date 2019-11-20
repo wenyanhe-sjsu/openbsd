@@ -743,8 +743,16 @@ pmap_page_protect(struct vm_page *pg, vm_prot_t prot)
 void
 pmap_protect(pmap_t pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 {
-	// XXX Required Function
-	UNIMPLEMENTED();
+	if (prot & (PROT_READ | PROT_EXEC)) {
+		pmap_lock(pm);
+		while (sva < eva) {
+			pmap_page_ro(pm, sva, prot);
+			sva += PAGE_SIZE;
+		}
+		pmap_unlock(pm);
+		return;
+	}
+	pmap_remove(pm, sva, eva);
 }
 
 void
