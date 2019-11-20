@@ -83,6 +83,9 @@ void pmap_set_l2(struct pmap *, uint64_t, struct pmapvp1 *, struct pmapvp2 *);
 void pmap_fill_pte(pmap_t pm, vaddr_t va, paddr_t pa, struct pte_desc *pted, vm_prot_t prot, int flags, int cache);
 void pmap_pte_insert(struct pte_desc *pted);
 void pmap_pte_remove(struct pte_desc *pted, int remove_pted);
+void pmap_pte_update(struct pte_desc *pted, uint64_t *pl3);
+void pmap_page_ro(pmap_t pm, vaddr_t va, vm_prot_t prot);
+
 void pmap_pinit(pmap_t pm);
 void pmap_release(pmap_t pm);
 
@@ -528,6 +531,74 @@ pmap_fill_pte(pmap_t pm, vaddr_t va, paddr_t pa, struct pte_desc *pted,
 }
 
 void
+pmap_pte_update(struct pte_desc *pted, uint64_t *pl3)
+{
+	uint64_t pte = 0, access_bits = 0, attr = 0;
+	// pmap_t pm = pted->pted_pmap;
+
+	/* see mair in locore.S */
+	// XXX Attribute Bits
+	// switch (pted->pted_va & pmap_cache_bits) {
+	// case pmap_cache_wb:
+	// 	/* inner and outer writeback */
+	// 	attr |= attr_idx(pte_attr_wb);
+	// 	attr |= attr_sh(sh_inner);
+	// 	break;
+	// case pmap_cache_wt:
+	// 	 /* inner and outer writethrough */
+	// 	attr |= attr_idx(pte_attr_wt);
+	// 	attr |= attr_sh(sh_inner);
+	// 	break;
+	// case pmap_cache_ci:
+	// 	attr |= attr_idx(pte_attr_ci);
+	// 	attr |= attr_sh(sh_inner);
+	// 	break;
+	// case pmap_cache_dev:
+	// 	attr |= attr_idx(pte_attr_dev);
+	// 	attr |= attr_sh(sh_inner);
+	// 	break;
+	// default:
+	// 	panic("pmap_pte_insert: invalid cache mode");
+	// }
+
+	// XXX Access Protect Bits
+	// if (pm->pm_privileged)
+	// 	access_bits = ap_bits_kern[pted->pted_pte & PROT_MASK];
+	// else
+	// 	access_bits = ap_bits_user[pted->pted_pte & PROT_MASK];
+
+	// XXX Construct the PTE -- double-check this
+	pte = (pted->pted_pte & PTE_RPGN) | attr | access_bits;
+	*pl3 = pte;
+}
+
+void
+pmap_page_ro(pmap_t pm, vaddr_t va, vm_prot_t prot)
+{
+	struct pte_desc *pted;
+	uint64_t *pl3;
+
+	/* Every VA needs a pted, even unmanaged ones. */
+	pted = pmap_vp_lookup(pm, va, &pl3);
+	if (!pted || !PTED_VALID(pted)) {
+		return;
+	}
+
+	pted->pted_va &= ~PROT_WRITE;
+	pted->pted_pte &= ~PROT_WRITE;
+	if ((prot & PROT_EXEC) == 0) {
+		pted->pted_va &= ~PROT_EXEC;
+		pted->pted_pte &= ~PROT_EXEC;
+	}
+	pmap_pte_update(pted, pl3);
+
+	// XXX TLB Flush?
+	// ttlb_flush(pm, pted->pted_va & ~PAGE_MASK);
+
+	return;
+}
+
+void
 pmap_collect(pmap_t pm)
 {
 	// XXX Optional Function
@@ -618,8 +689,55 @@ CTASSERT(sizeof(struct pmapvp0) == 2 * PAGE_SIZE);
 void
 pmap_page_protect(struct vm_page *pg, vm_prot_t prot)
 {
-	// XXX Required Function
-	UNIMPLEMENTED();
+	struct pte_desc *pted;
+	struct pmap *pm;
+
+	if (prot != PROT_NONE) {
+		mtx_enter(&pg->mdpage.pv_mtx);
+		LIST_FOREACH(pted, &(pg->mdpage.pv_list), pted_pv_list) {
+			pmap_page_ro(pted->pted_pmap, pted->pted_va, prot);
+		}
+		mtx_leave(&pg->mdpage.pv_mtx);
+		return;
+	}
+
+	mtx_enter(&pg->mdpage.pv_mtx);
+	while ((pted = LIST_FIRST(&(pg->mdpage.pv_list))) != NULL) {
+		pmap_reference(pted->pted_pmap);
+		pm = pted->pted_pmap;
+		mtx_leave(&pg->mdpage.pv_mtx);
+
+		pmap_lock(pm);
+
+		/*
+		 * We dropped the pvlist lock before grabbing the pmap
+		 * lock to avoid lock ordering problems.  This means
+		 * we have to check the pvlist again since somebody
+		 * else might have modified it.  All we care about is
+		 * that the pvlist entry matches the pmap we just
+		 * locked.  If it doesn't, unlock the pmap and try
+		 * again.
+		 */
+		mtx_enter(&pg->mdpage.pv_mtx);
+		pted = LIST_FIRST(&(pg->mdpage.pv_list));
+		if (pted == NULL || pted->pted_pmap != pm) {
+			mtx_leave(&pg->mdpage.pv_mtx);
+			pmap_unlock(pm);
+			pmap_destroy(pm);
+			mtx_enter(&pg->mdpage.pv_mtx);
+			continue;
+		}
+		mtx_leave(&pg->mdpage.pv_mtx);
+
+		pmap_remove_pted(pm, pted);
+		pmap_unlock(pm);
+		pmap_destroy(pm);
+
+		mtx_enter(&pg->mdpage.pv_mtx);
+	}
+	/* page is being reclaimed, sync icache next use */
+	atomic_clearbits_int(&pg->pg_flags, PG_PMAP_EXE);
+	mtx_leave(&pg->mdpage.pv_mtx);
 }
 
 void
