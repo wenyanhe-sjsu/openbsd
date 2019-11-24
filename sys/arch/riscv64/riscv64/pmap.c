@@ -614,6 +614,22 @@ pmap_fill_pte(pmap_t pm, vaddr_t va, paddr_t pa, struct pte_desc *pted,
 }
 
 void
+pmap_pte_insert(struct pte_desc *pted)
+{
+	/* put entry into table */
+	/* need to deal with ref/change here */
+	pmap_t pm = pted->pted_pmap;
+	uint64_t *pl3;
+
+	if (pmap_vp_lookup(pm, pted->pted_va, &pl3) == NULL) {
+		panic("%s: have a pted, but missing a vp"
+		    " for %lx va pmap %p", __func__, pted->pted_va, pm);
+	}
+
+	pmap_pte_update(pted, pl3);
+}
+
+void
 pmap_pte_update(struct pte_desc *pted, uint64_t *pl3)
 {
 	uint64_t pte = 0, access_bits = 0, attr = 0;
