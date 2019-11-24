@@ -84,8 +84,8 @@ void pmap_set_l2(struct pmap *, uint64_t, struct pmapvp1 *, struct pmapvp2 *);
 
 void pmap_fill_pte(pmap_t pm, vaddr_t va, paddr_t pa, struct pte_desc *pted, vm_prot_t prot, int flags, int cache);
 void pmap_pte_insert(struct pte_desc *pted);
-void pmap_pte_remove(struct pte_desc *pted, int remove_pted);
 void pmap_pte_update(struct pte_desc *pted, uint64_t *pl3);
+void pmap_pte_remove(struct pte_desc *pted, int remove_pted);
 void pmap_page_ro(pmap_t pm, vaddr_t va, vm_prot_t prot);
 
 void pmap_pinit(pmap_t pm);
@@ -669,6 +669,33 @@ pmap_pte_update(struct pte_desc *pted, uint64_t *pl3)
 	// XXX Construct the PTE -- double-check this
 	pte = (pted->pted_pte & PTE_RPGN) | attr | access_bits;
 	*pl3 = pte;
+}
+
+void
+pmap_pte_remove(struct pte_desc *pted, int remove_pted)
+{
+	/* put entry into table */
+	/* need to deal with ref/change here */
+	struct pmapvp1 *vp1;
+	struct pmapvp2 *vp2;
+	pmap_t pm = pted->pted_pmap;
+
+	vp1 = pm->pm_vp0->vp[VP_IDX0(pted->pted_va)];
+	if (vp1 == NULL) {
+		panic("have a pted, but missing the l1 for %lx va pmap %p",
+		    pted->pted_va, pm);
+	}
+	vp2 = vp1->vp[VP_IDX1(pted->pted_va)];
+	if (vp2 == NULL) {
+		panic("have a pted, but missing the l2 for %lx va pmap %p",
+		    pted->pted_va, pm);
+	}
+	vp2->l2[VP_IDX2(pted->pted_va)] = 0;
+	if (remove_pted)
+		vp2->vp[VP_IDX2(pted->pted_va)] = NULL;
+
+	// TLB Flush?
+	// ttlb_flush(pm, pted->pted_va);
 }
 
 void
