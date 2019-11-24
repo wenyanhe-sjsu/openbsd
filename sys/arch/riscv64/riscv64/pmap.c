@@ -539,6 +539,49 @@ pmap_kremove_pg(vaddr_t va)
 }
 
 void
+pmap_set_l1(struct pmap *pm, uint64_t va, struct pmapvp1 *l1_va)
+{
+	uint64_t pg_entry;
+	paddr_t l1_pa;
+	int idx0;
+
+	if (pmap_extract(pmap_kernel(), (vaddr_t)l1_va, &l1_pa) == 0)
+		panic("unable to find vp pa mapping %p\n", l1_va);
+
+	if (l1_pa & (Lx_TABLE_ALIGN-1))
+		panic("misaligned L1 table\n");
+
+	// XXX Massage PA to pg_entry
+	pg_entry = l1_pa;
+
+	idx0 = VP_IDX0(va);
+	pm->pm_vp0->vp[idx0] = l1_va;
+	pm->pm_vp0->l0[idx0] = pg_entry;
+}
+
+void
+pmap_set_l2(struct pmap *pm, uint64_t va, struct pmapvp1 *vp1,
+    struct pmapvp2 *l2_va)
+{
+	uint64_t pg_entry;
+	paddr_t l2_pa;
+	int idx1;
+
+	if (pmap_extract(pmap_kernel(), (vaddr_t)l2_va, &l2_pa) == 0)
+		panic("unable to find vp pa mapping %p\n", l2_va);
+
+	if (l2_pa & (Lx_TABLE_ALIGN-1))
+		panic("misaligned L2 table\n");
+
+	// XXX Massage PA to pg_entry
+	pg_entry = l2_pa;
+
+	idx1 = VP_IDX1(va);
+	vp1->vp[idx1] = l2_va;
+	vp1->l1[idx1] = pg_entry;
+}
+
+void
 pmap_fill_pte(pmap_t pm, vaddr_t va, paddr_t pa, struct pte_desc *pted,
     vm_prot_t prot, int flags, int cache)
 {
