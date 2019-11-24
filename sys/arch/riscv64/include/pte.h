@@ -34,24 +34,24 @@
 #define ATTR_V		(1UL << 0)	/* Valid */
 
 /* Level 0 table, 4KiB per entry */
-#define		L0_SHIFT	12
-#define		L0_SIZE		(1ULL << L0_SHIFT)
-#define		L0_OFFSET	(L0_SIZE - 1)
+#define	 L0_SHIFT	12
+#define	 L0_SIZE	(1ULL << L0_SHIFT)
+#define	 L0_OFFSET	(L0_SIZE - 1)
 
 /* Level 1 table, 2MiB per entry */
-#define		L1_SHIFT	21
-#define		L1_SIZE		(1UL << L1_SHIFT)
-#define		L1_OFFSET	(L1_SIZE - 1)
+#define	 L1_SHIFT	21
+#define	 L1_SIZE	(1UL << L1_SHIFT)
+#define	 L1_OFFSET	(L1_SIZE - 1)
 
 /* Level 2 table, 1GiB per entry */
-#define		L2_SHIFT	30
-#define		L2_SIZE		(1UL << L2_SHIFT)
-#define		L2_OFFSET	(L2_SIZE - 1)
+#define	 L2_SHIFT	30
+#define	 L2_SIZE	(1UL << L2_SHIFT)
+#define	 L2_OFFSET	(L2_SIZE - 1)
 
 /* page mapping */
-#define		Ln_ENTRIES	(1 << 9)
-#define		Ln_ADDR_MASK	(Ln_ENTRIES - 1)
-#define		Ln_TABLE_MASK	((1 << 12) - 1)
+#define	 Ln_ENTRIES	(1 << 9)
+#define	 Ln_ADDR_MASK	(Ln_ENTRIES - 1)
+#define	 Ln_TABLE_MASK	((1 << 12) - 1)
 
 /* physical page number mask */
 #define PTE_RPGN (((1ULL << 56) - 1) & ~PAGE_MASK)
