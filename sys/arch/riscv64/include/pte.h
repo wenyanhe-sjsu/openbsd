@@ -19,6 +19,8 @@
 
 #include "machine/vmparam.h"
 
+#define Lx_TABLE_ALIGN	(4096)
+
 /* Block and Page attributes */
 #define ATTR_MASK	(0x3ffUL)
 #define ATTR_RSW	(3UL << 8)	/* Supervisor Reserved */
