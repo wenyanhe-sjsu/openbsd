@@ -802,7 +802,40 @@ pmap_destroy(pmap_t pm)
 void
 pmap_release(pmap_t pm)
 {
-	UNIMPLEMENTED();
+	struct pmapvp0 *vp0;
+	struct pmapvp1 *vp1;
+	struct pmapvp2 *vp2;
+	struct pte_desc *pted;
+	int i, j, k;
+
+	vp0 = pm->pm_vp0;
+	for (i = 0; i < VP_IDX0_CNT; i++) {
+		vp1 = vp0->vp[i];
+		if (vp1 == NULL)
+			continue;
+		vp0->vp[i] = NULL;
+
+		for (j = 0; j < VP_IDX1_CNT; j++) {
+			vp2 = vp1->vp[j];
+			if (vp2 == NULL)
+				continue;
+			vp1->vp[j] = NULL;
+
+			for (k = 0; k < VP_IDX2_CNT; k++) {
+				pted = vp2->vp[k];
+				if (pted == NULL)
+					continue;
+				vp2->vp[k] = NULL;
+
+				pool_put(&pmap_pted_pool, pted);
+			}
+
+			pool_put(&pmap_vp_pool, vp2);
+		}
+		pool_put(&pmap_vp_pool, vp1);
+	}
+	pool_put(&pmap_vp_pool, vp0);
+	pm->pm_vp0 = NULL;
 }
 
 /*
