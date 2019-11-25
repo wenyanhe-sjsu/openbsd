@@ -316,6 +316,32 @@ PTED_VALID(struct pte_desc *pted)
 	return (pted->pted_pte != 0);
 }
 
+void
+pmap_enter_pv(struct pte_desc *pted, struct vm_page *pg)
+{
+	/*
+	 * XXX does this test mean that some pages try to be managed,
+	 * but this is called too soon?
+	 */
+	if (__predict_false(!pmap_initialized))
+		return;
+
+	mtx_enter(&pg->mdpage.pv_mtx);
+	LIST_INSERT_HEAD(&(pg->mdpage.pv_list), pted, pted_pv_list);
+	pted->pted_va |= PTED_VA_MANAGED_M;
+	mtx_leave(&pg->mdpage.pv_mtx);
+}
+
+void
+pmap_remove_pv(struct pte_desc *pted)
+{
+	struct vm_page *pg = PHYS_TO_VM_PAGE(pted->pted_pte & PTE_RPGN);
+
+	mtx_enter(&pg->mdpage.pv_mtx);
+	LIST_REMOVE(pted, pted_pv_list);
+	mtx_leave(&pg->mdpage.pv_mtx);
+}
+
 int
 pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, int flags)
 {
