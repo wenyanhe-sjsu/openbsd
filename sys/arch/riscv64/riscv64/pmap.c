@@ -35,9 +35,6 @@
 #include <ddb/db_extern.h>
 #include <ddb/db_output.h>
 
-// XXX Get rid of this once PMAP is complete
-#define UNIMPLEMENTED()	panic("%s:%s UNIMPLEMENTED", __FILE__, __func__)
-
 struct pmap kernel_pmap_;
 struct pmap pmap_tramp;
 
