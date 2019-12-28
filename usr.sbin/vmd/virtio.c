@@ -2295,7 +2295,7 @@ virtio_init(struct vmd_vm *vm, int child_cdrom,
 	viombh.irq = pci_get_dev_irq(id);
 	viombh.vm_id = vcp->vcp_id;
 	viombh.cfg.device_feature = VIRTIO_BALLOON_F_STATS_VQ;
-
+	viombh_vq_dequeue();
 	/* cmpe end */
 }
 

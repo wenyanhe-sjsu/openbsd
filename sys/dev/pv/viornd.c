@@ -91,7 +91,7 @@ viornd_attach(struct device *parent, struct device *self, void *aux)
 	vsc->sc_nvqs = 1;
 	vsc->sc_config_change = 0;
 	#if VIORND_DEBUG
-		printf("CMPE I am just trying %s\n", vsc->sc_child);
+		printf("CMPE %s\n", __func__);
 	#endif
 	if (vsc->sc_child != NULL)
 		panic("already attached to something else");

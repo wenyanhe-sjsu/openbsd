@@ -62,13 +62,14 @@
 #include <dev/pv/virtioreg.h>
 #include <dev/pv/virtiovar.h>
 #include <virtio.h>
+#define VIOMBH_DEBUG 1
 
 //void	viombh_worker(void *);
 //void	viombh_inflate(struct viombh_softc *);
 //void	viombh_deflate(struct viombh_softc *);
 //int	viombh_config_change(struct virtio_softc *);
 //void	viombh_read_config(struct viombh_softc *);
-//int	viombh_vq_dequeue(struct virtqueue *);
+void	viombh_vq_dequeue();
 //int	viombh_inflate_intr(struct virtqueue *);
 //int	viombh_deflate_intr(struct virtqueue *);
 //int	viombh_stat_intr(struct virtqueue *);
@@ -143,3 +144,14 @@ static unsigned int features[] = {
 	VIRTIO_BALLOON_F_MUST_TELL_HOST,
 	VIRTIO_BALLOON_F_STATS_VQ,
 };
+
+static void viombh_vq_dequeue(){
+	virtio_softc *sc;
+	while(true){
+		int idx = sc->sc_vqs->vq_queued;
+		#if VIOMBH_DEBUG
+			printf("%s: CMPE got idx\n", __func__, idx);
+		#endif
+	}
+
+}
