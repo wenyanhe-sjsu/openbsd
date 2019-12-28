@@ -2274,11 +2274,11 @@ virtio_init(struct vmd_vm *vm, int child_cdrom,
 	if (pci_add_bar(id,
         PCI_MAPREG_TYPE_IO,     //defined in pci/pcireg.h
         virtio_mbh_io, NULL)) {
-		log_warnx("%s: can't add bar for virtio mem device",
+		log_warnx("%s: can't add bar for virtio memball device",
 			__progname);
 		return;
 	}
-
+	printf("\n I am here testing2");
 	// viombh defined in vmd/virtio.h
 	// vcp "vm_create_params" defined in include/vmmvar.h
 	memset(&viombh, 0, sizeof(viombh));
@@ -2295,6 +2295,7 @@ virtio_init(struct vmd_vm *vm, int child_cdrom,
 	viombh.irq = pci_get_dev_irq(id);
 	viombh.vm_id = vcp->vcp_id;
 	viombh.cfg.device_feature = VIRTIO_BALLOON_F_STATS_VQ;
+	printf("\n I am here testing1");
 	viombh_vq_dequeue();
 	/* cmpe end */
 }
