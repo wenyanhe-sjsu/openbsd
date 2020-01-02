@@ -360,3 +360,4 @@ int vioscsi_notifyq(struct vioscsi_dev *);
 
 /* CMPE */
 int virtio_mbh_io(int, uint16_t, uint32_t *, uint8_t *, void *, uint8_t);
+void viombh_vq_dequeue(void);
