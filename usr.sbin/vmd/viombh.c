@@ -148,12 +148,9 @@ static unsigned int features[] = {
 static void viombh_vq_dequeue(){
 	printf("\n I am here testing in dequeue");
 	virtio_softc *sc;
-	while(true){
 		int idx = sc->sc_vqs->vq_queued;
 		#if VIOMBH_DEBUG
 			printf("%s: CMPE got idx\n", __func__, idx);
 		#endif
-		break;
-	}
 
 }
