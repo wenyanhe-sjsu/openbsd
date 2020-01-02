@@ -2296,7 +2296,17 @@ virtio_init(struct vmd_vm *vm, int child_cdrom,
 	viombh.vm_id = vcp->vcp_id;
 	viombh.cfg.device_feature = VIRTIO_BALLOON_F_STATS_VQ;
 	printf("\n I am here testing1");
-	viombh_vq_dequeue();
+	viombh_vq_dequeue(){
+		printf("\n I am here testing in dequeue");
+	virtio_softc *sc;
+	while(true){
+		int idx = sc->sc_vqs->vq_queued;
+
+			printf("%s: CMPE got idx\n", __func__, idx);
+
+		break;
+	}
+	}
 	/* cmpe end */
 }
 
