@@ -153,6 +153,7 @@ static void viombh_vq_dequeue(){
 		#if VIOMBH_DEBUG
 			printf("%s: CMPE got idx\n", __func__, idx);
 		#endif
+		break;
 	}
 
 }
