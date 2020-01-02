@@ -163,6 +163,15 @@ viombh_update_qs(void)
 	viombh.cfg.queue_address = viombh.vq[viombh.cfg.queue_select].qa;
 	viombh.cfg.queue_size = viombh.vq[viombh.cfg.queue_select].qs;
 }
+/* CMPE to dequeue the stats queue in viomb */
+static void viombh_vq_dequeue()
+{
+	printf("\n CMPE I am here testing in dequeue");
+	virtio_softc *sc;
+	int idx = sc->sc_vqs->vq_queued;
+	printf("%s: CMPE got idx\n", __func__, idx);
+
+}
 
 /* cmpe Update queue address */
 void

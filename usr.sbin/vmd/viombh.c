@@ -145,12 +145,4 @@ static unsigned int features[] = {
 	VIRTIO_BALLOON_F_STATS_VQ,
 };
 
-static void viombh_vq_dequeue(){
-	printf("\n I am here testing in dequeue");
-	virtio_softc *sc;
-		int idx = sc->sc_vqs->vq_queued;
-		#if VIOMBH_DEBUG
-			printf("%s: CMPE got idx\n", __func__, idx);
-		#endif
-
-}
+//removed the dequeue function from here
