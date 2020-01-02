@@ -167,8 +167,8 @@ viombh_update_qs(void)
 static void viombh_vq_dequeue()
 {
 	printf("\n CMPE I am here testing in dequeue");
-	virtio_softc *sc;
-	int idx = sc->sc_vqs->vq_queued;
+	viombh_dev *sb;
+	int idx = sb->vq[0]->vq_queued;
 	printf("%s: CMPE got idx\n", __func__, idx);
 
 }
