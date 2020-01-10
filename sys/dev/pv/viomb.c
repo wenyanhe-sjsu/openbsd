@@ -683,7 +683,7 @@ viomb_stats_intr(struct virtqueue *vq)
 static void viombh_vq_dequeue()
 {
 	printf("\n CMPE testinf for dequeue\n");
-	virtio_softc *sc;
+	struct virtio_softc *sc;
 	int idx = sc->sc_vqs->vq_queued;
 	printf("%s: CMPE got idx: %d\n",__func__, idx);
 }
