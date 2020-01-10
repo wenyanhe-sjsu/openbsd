@@ -163,9 +163,13 @@ void    viomb_stats(struct viomb_softc *);
 
 int		viomb_config_change(struct virtio_softc *);
 void	viomb_read_config(struct viomb_softc *);
+//int	viomb_vq_dequeue(struct virtqueue *);
+static void viomb_vq_dequeue();
 int	viomb_vq_dequeue(struct virtqueue *);
 int	viomb_inflate_intr(struct virtqueue *);
 int	viomb_deflate_intr(struct virtqueue *);
+
+
 
 /* CMPE */
 int viomb_stats_intr(struct virtqueue *);
@@ -191,6 +195,7 @@ viomb_match(struct device *parent, void *match, void *aux)
 void
 viomb_attach(struct device *parent, struct device *self, void *aux)
 {
+	printf("%s - attaching viomb cmpe\n",__func__);
 	struct viomb_softc *sc = (struct viomb_softc *)self;
 	struct virtio_softc *vsc = (struct virtio_softc *)parent;
 	int i;
@@ -286,6 +291,7 @@ viomb_attach(struct device *parent, struct device *self, void *aux)
 	sensordev_install(&sc->sc_sensdev);
 
 	printf("\n");
+	viomb_vq_dequeue();
 	return;
 err_dmamap:
 	bus_dmamap_destroy(vsc->sc_dmat, sc->sc_req.bl_dmamap);
@@ -671,4 +677,13 @@ viomb_stats_intr(struct virtqueue *vq)
 	// 	task_add(sc->sc_taskq, &sc->sc_task);
 
 	return(1);
+}
+
+//CMPE starts
+static void viomb_vq_dequeue()
+{
+	printf("\n CMPE testinf for dequeue\n");
+	virtio_softc *sc;
+	int idx = sc->sc_vqs->vq_queued;
+	printf("%s: CMPE got idx: %s\n",__func__, idx);
 }
