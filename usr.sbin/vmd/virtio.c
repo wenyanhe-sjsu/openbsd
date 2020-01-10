@@ -47,6 +47,7 @@
 #include "loadfile.h"
 #include "atomicio.h"
 
+
 extern char *__progname;
 
 struct viornd_dev viornd;
@@ -161,6 +162,15 @@ viombh_update_qs(void)
 	/* Update queue address/size based on queue select */
 	viombh.cfg.queue_address = viombh.vq[viombh.cfg.queue_select].qa;
 	viombh.cfg.queue_size = viombh.vq[viombh.cfg.queue_select].qs;
+}
+/* CMPE to dequeue the stats queue in viomb */
+static void viombh_vq_dequeue()
+{
+	printf("\n CMPE I am here testing in dequeue");
+	viombh_dev *sb;
+	int idx = sb->vq[0]->vq_queued;
+	printf("%s: CMPE got idx\n", __func__, idx);
+
 }
 
 /* cmpe Update queue address */
