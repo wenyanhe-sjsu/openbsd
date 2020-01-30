@@ -19,6 +19,8 @@
 
 #include "machine/vmparam.h"
 
+#define Lx_TABLE_ALIGN	(4096)
+
 /* Block and Page attributes */
 #define ATTR_MASK	(0x3ffUL)
 #define ATTR_RSW	(3UL << 8)	/* Supervisor Reserved */
@@ -32,26 +34,33 @@
 #define ATTR_V		(1UL << 0)	/* Valid */
 
 /* Level 0 table, 4KiB per entry */
-#define		L0_SHIFT	12
-#define		L0_SIZE		(1ULL << L0_SHIFT)
-#define		L0_OFFSET	(L0_SIZE - 1)
+#define	 L0_SHIFT	12
+#define	 L0_SIZE	(1ULL << L0_SHIFT)
+#define	 L0_OFFSET	(L0_SIZE - 1)
 
 /* Level 1 table, 2MiB per entry */
-#define		L1_SHIFT	21
-#define		L1_SIZE		(1UL << L1_SHIFT)
-#define		L1_OFFSET	(L1_SIZE - 1)
+#define	 L1_SHIFT	21
+#define	 L1_SIZE	(1UL << L1_SHIFT)
+#define	 L1_OFFSET	(L1_SIZE - 1)
 
 /* Level 2 table, 1GiB per entry */
-#define		L2_SHIFT	30
-#define		L2_SIZE		(1UL << L2_SHIFT)
-#define		L2_OFFSET	(L2_SIZE - 1)
+#define	 L2_SHIFT	30
+#define	 L2_SIZE	(1UL << L2_SHIFT)
+#define	 L2_OFFSET	(L2_SIZE - 1)
 
 /* page mapping */
-#define		Ln_ENTRIES	(1 << 9)
-#define		Ln_ADDR_MASK	(Ln_ENTRIES - 1)
-#define		Ln_TABLE_MASK	((1 << 12) - 1)
+#define	 Ln_ENTRIES	(1 << 9)
+#define	 Ln_ADDR_MASK	(Ln_ENTRIES - 1)
+#define	 Ln_TABLE_MASK	((1 << 12) - 1)
 
 /* physical page number mask */
 #define PTE_RPGN (((1ULL << 56) - 1) & ~PAGE_MASK)
+
+#ifndef _LOCORE
+
+typedef uint64_t pd_entry_t;
+typedef uint64_t pt_entry_t;
+
+#endif /* !_LOCORE */
 
 #endif /* _RISCV64_PTE_H_ */

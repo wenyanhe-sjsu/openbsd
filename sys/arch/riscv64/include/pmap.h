@@ -28,13 +28,13 @@
 // XXX Only targeting compatibility with SV39
 #define VP_IDX0_CNT	512
 #define VP_IDX0_MASK	(VP_IDX0_CNT-1)
-#define VP_IDX0_POS	12
+#define VP_IDX0_POS	30
 #define VP_IDX1_CNT	512
 #define VP_IDX1_MASK	(VP_IDX1_CNT-1)
 #define VP_IDX1_POS	21
 #define VP_IDX2_CNT	512
 #define VP_IDX2_MASK	(VP_IDX2_CNT-1)
-#define VP_IDX2_POS	30
+#define VP_IDX2_POS	12
 
 /* cache flags */
 // XXX These are duplicated from arm64 and may need some reworking
@@ -58,8 +58,8 @@ typedef struct pmap *pmap_t;
 
 struct pmap {
 	struct mutex pm_mtx;
-	struct pmapvp2 *pm_vp;	/* SV39 */
-	uint64_t pm_pa;
+	struct pmapvp0 *pm_vp0;
+	uint64_t pm_pa0;
 	int pm_privileged;
 	int pm_asid;
 	int pm_refs;				/* ref count */
@@ -86,23 +86,10 @@ extern struct pmap kernel_pmap_;
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
 
-vaddr_t pmap_bootstrap(long kvo, paddr_t lpt1,  long kernelstart,
-    long kernelend, long ram_start, long ram_end);
-void pmap_kenter_cache(vaddr_t va, paddr_t pa, vm_prot_t prot, int cacheable);
-
-paddr_t pmap_steal_avail(size_t size, int align, void **kva);
-void pmap_avail_fixup();
-void pmap_physload_avail();
-
-#define PMAP_GROWKERNEL
-
 struct pv_entry;
 
 /* investigate */
 #define pmap_unuse_final(p)		do { /* nothing */ } while (0)
-int	pmap_fault_fixup(pmap_t, vaddr_t, vm_prot_t, int);
-void	pmap_postinit(void);
-void	pmap_map_early(paddr_t, psize_t);
 
 #endif /* _KERNEL && !_LOCORE */
 

@@ -8,3 +8,4 @@ revisit settings in param.h (FDT / ACPI / U-Area / Clusters / Buffer)
 Look into implementing riscv64/cpufunc.c, if necessary
 
 DDB is completely unimplemented. Don't expect it to work.
+PMAP is missing quite a few pieces (TLB Flush, etc.)
