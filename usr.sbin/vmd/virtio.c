@@ -2231,23 +2231,6 @@ virtio_init(struct vmd_vm *vm, int child_cdrom,
 		return;
 	}
 
-	/* virtio memory balloon device */
-	if (pci_add_device(&id, PCI_VENDOR_QUMRANET,
-	    PCI_PRODUCT_QUMRANET_VIO_MEM, PCI_CLASS_SYSTEM,
-	    PCI_SUBCLASS_SYSTEM_MISC,
-	    PCI_VENDOR_OPENBSD,
-	    PCI_PRODUCT_VIRTIO_BALLOON, 1, NULL)) {
-		log_warnx("%s: can't add PCI virtio mem device",
-		    __progname);
-		return;
-	}
-
-	if (pci_add_bar(id, PCI_MAPREG_TYPE_IO, NULL, NULL)) {
-		log_warnx("%s: can't add bar for virtio mem device",
-		    __progname);
-		return;
-	}
-
 	memset(&vmmci, 0, sizeof(vmmci));
 	vmmci.cfg.device_feature = VMMCI_F_TIMESYNC | VMMCI_F_ACK |
 	    VMMCI_F_SYNCRTC;
@@ -2271,7 +2254,7 @@ virtio_init(struct vmd_vm *vm, int child_cdrom,
             PCI_PRODUCT_VIRTIO_BALLOON,     // defined in pv/virtioreg.h
             1,
             NULL)) {
-			log_warnx("%s: can't add PCI virtio mem device",
+			log_warnx("%s: can't add PCI virtio memory balloon device",
 				__progname);
 			return;
 	}
@@ -2284,7 +2267,7 @@ virtio_init(struct vmd_vm *vm, int child_cdrom,
 	if (pci_add_bar(id,
         PCI_MAPREG_TYPE_IO,     //defined in pci/pcireg.h
         virtio_mbh_io, NULL)) {
-		log_warnx("%s: can't add bar for virtio memball device",
+		log_warnx("%s: can't add bar for virtio memory balloon device",
 			__progname);
 		return;
 	}

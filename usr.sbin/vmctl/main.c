@@ -68,6 +68,7 @@ int		 ctl_pause(struct parse_result *, int, char *[]);
 int		 ctl_unpause(struct parse_result *, int, char *[]);
 int		 ctl_send(struct parse_result *, int, char *[]);
 int		 ctl_receive(struct parse_result *, int, char *[]);
+int		 ctl_getStats(struct parse_result *, int, char *[]);
 
 struct ctl_command ctl_commands[] = {
 	{ "console",	CMD_CONSOLE,	ctl_console,	"id" },
@@ -88,6 +89,7 @@ struct ctl_command ctl_commands[] = {
 	{ "stop",	CMD_STOP,	ctl_stop,	"[-fw] [id | -a]" },
 	{ "unpause",	CMD_UNPAUSE,	ctl_unpause,	"id" },
 	{ "wait",	CMD_WAITFOR,	ctl_waitfor,	"id" },
+	{ "getStats",	CMD_GETSTATS,	ctl_getStats,	"id" },
 	{ NULL }
 };
 
@@ -269,6 +271,8 @@ vmmaction(struct parse_result *res)
 	case CMD_RECEIVE:
 		vm_receive(res->id, res->name);
 		break;
+	case CMD_GETSTATS:
+		vm_getStats(res->id, res->name);
 	case CMD_CREATE:
 	case NONE:
 		/* The action is not expected here */
@@ -1047,4 +1051,16 @@ ctl_openconsole(const char *name)
 		err(1, "unveil");
 	execl(VMCTL_CU, VMCTL_CU, "-l", name, "-s", "115200", (char *)NULL);
 	err(1, "failed to open the console");
+}
+
+int
+ctl_getStats(struct parse_result *res, int argc, char *argv[])
+{
+	if (argc == 2) {
+		if (parse_vmid(res, argv[1], 0) == -1)
+			errx(1, "invalid id: %s", argv[1]);
+	} else if (argc != 2)
+		ctl_usage(res->ctl);
+
+	return (vmmaction(res));
 }

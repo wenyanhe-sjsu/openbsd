@@ -950,3 +950,10 @@ create_imagefile(int type, const char *imgfile_path, const char *base_path,
 	return (ret);
 }
 
+// vmctl get memory status information from VMs
+int vm_getStats(uint32_t start_id, const char *name)
+{
+	printf("CMPE vm_getStats");
+	return 0;
+}
+
