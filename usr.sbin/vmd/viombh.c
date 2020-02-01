@@ -69,7 +69,7 @@
 //void	viombh_deflate(struct viombh_softc *);
 //int	viombh_config_change(struct virtio_softc *);
 //void	viombh_read_config(struct viombh_softc *);
-void	viombh_vq_dequeue();
+//void	viombh_vq_dequeue();
 //int	viombh_inflate_intr(struct virtqueue *);
 //int	viombh_deflate_intr(struct virtqueue *);
 //int	viombh_stat_intr(struct virtqueue *);

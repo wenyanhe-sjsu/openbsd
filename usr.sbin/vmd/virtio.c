@@ -164,14 +164,14 @@ viombh_update_qs(void)
 	viombh.cfg.queue_size = viombh.vq[viombh.cfg.queue_select].qs;
 }
 /* CMPE to dequeue the stats queue in viomb */
-static void viombh_vq_dequeue()
-{
-	printf("\n CMPE I am here testing in dequeue");
-	viombh_dev *sb;
-	int idx = sb->vq[0]->vq_queued;
-	printf("%s: CMPE got idx\n", __func__, idx);
+// static void viombh_vq_dequeue()
+// {
+// 	printf("\n CMPE I am here testing in dequeue");
+// 	viombh_dev *sb;
+// 	int idx = sb->vq[0]->vq_queued;
+// 	printf("%s: CMPE got idx\n", __func__, idx);
 
-}
+// }
 
 /* cmpe Update queue address */
 void
@@ -2289,7 +2289,7 @@ virtio_init(struct vmd_vm *vm, int child_cdrom,
 	viombh.vm_id = vcp->vcp_id;
 	viombh.cfg.device_feature = VIRTIO_BALLOON_F_STATS_VQ;
 	printf("\n I am here testing1");
-	viombh_vq_dequeue();
+	//viombh_vq_dequeue();
 	/* cmpe end */
 }
 
