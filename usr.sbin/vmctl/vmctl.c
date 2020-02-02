@@ -953,7 +953,37 @@ create_imagefile(int type, const char *imgfile_path, const char *base_path,
 // vmctl get memory status information from VMs
 int vm_getStats(uint32_t start_id, const char *name)
 {
-	printf("CMPE vm_getStats");
+	get_info_vm(null, null, CMD_CONSOLE, null );
 	return 0;
+}
+
+// CMPE
+
+int
+get_num_vm(struct imsg *imsg, int *ret)
+{
+	static size_t ct = 0;
+	static struct vmop_info_result *vir = NULL;
+
+	printf("CMPE imsg header type - %d", imsg->hdr.type); 
+
+	if (imsg->hdr.type == IMSG_VMDOP_GET_INFO_VM_DATA) {
+		vir = reallocarray(vir, ct + 1,
+		    sizeof(struct vmop_info_result));
+		if (vir == NULL) {
+			*ret = ENOMEM;
+			return (1);
+		}
+		memcpy(&vir[ct], imsg->data, sizeof(struct vmop_info_result));
+		ct++;
+		printf("CMPE imsg counter - %d", ct); 
+		*ret = 0;
+		return (ct);
+	}	
+	else {
+		*ret = EINVAL;
+		printf("CMPE imsg counter - %d", ct);
+		return (ct);
+	}
 }
 

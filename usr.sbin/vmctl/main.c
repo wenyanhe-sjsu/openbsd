@@ -238,6 +238,7 @@ vmmaction(struct parse_result *res)
 	case CMD_STATUS:
 	case CMD_CONSOLE:
 	case CMD_STOPALL:
+		printf("CMPE %s - %s - %s -%d", res->id, res->name, res->action, res->flags);
 		get_info_vm(res->id, res->name, res->action, res->flags);
 		break;
 	case CMD_LOAD:
@@ -272,7 +273,8 @@ vmmaction(struct parse_result *res)
 		vm_receive(res->id, res->name);
 		break;
 	case CMD_GETSTATS:
-		vm_getStats(res->id, res->name);
+		vm_getStats(res->id, res->name, res->action);
+		break;
 	case CMD_CREATE:
 	case NONE:
 		/* The action is not expected here */
@@ -339,6 +341,9 @@ vmmaction(struct parse_result *res)
 				break;
 			case CMD_UNPAUSE:
 				done = unpause_vm_complete(&imsg, &ret);
+				break;
+			case CMD_GETSTATS:
+				done = get_num_vm(&imsg, &ret);
 				break;
 			default:
 				done = 1;
