@@ -953,7 +953,7 @@ create_imagefile(int type, const char *imgfile_path, const char *base_path,
 // vmctl get memory status information from VMs
 int vm_getStats(uint32_t start_id, const char *name)
 {
-	get_info_vm(null, null, CMD_CONSOLE, null );
+	get_info_vm(NULL, NULL, CMD_CONSOLE, NULL );
 	return 0;
 }
 
