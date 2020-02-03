@@ -29,6 +29,9 @@ include <machine/frame.h>
 include <machine/pcb.h>
 include <machine/cpu.h>
 
+export	VM_MAXUSER_ADDRESS
+export	VM_MIN_KERNEL_ADDRESS
+
 struct	trapframe
 member	tf_ra
 member	tf_sp

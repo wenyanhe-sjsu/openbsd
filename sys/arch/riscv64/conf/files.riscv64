@@ -16,6 +16,8 @@ file	arch/riscv64/riscv64/bus_dma.c
 file	arch/riscv64/riscv64/conf.c
 file	arch/riscv64/riscv64/disksubr.c		disk
 file	arch/riscv64/riscv64/locore.S
+file	arch/riscv64/riscv64/copyinout.S
+file	arch/riscv64/riscv64/copystr.c
 file	arch/riscv64/riscv64/machdep.c
 file	arch/riscv64/riscv64/intr.c
 file	arch/riscv64/riscv64/pmap.c
