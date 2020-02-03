@@ -63,20 +63,20 @@
 // XXX Profiler Support
 #error PROF / GPROF not yet supported for riscv64
 #else
-# define _PROF_PROLOGUE
+#define _PROF_PROLOGUE
 #endif
 
 #if defined(_RET_PROTECTOR)
 // XXX Retguard Support
 #error RETGUARD not yet supported for riscv64
 #else
-# define RETGUARD_CALC_COOKIE(reg)
-# define RETGUARD_LOAD_RANDOM(x, reg)
-# define RETGUARD_SETUP(x, reg)
-# define RETGUARD_CHECK(x, reg)
-# define RETGUARD_PUSH(reg)
-# define RETGUARD_POP(reg)
-# define RETGUARD_SYMBOL(x)
+#define RETGUARD_CALC_COOKIE(reg)
+#define RETGUARD_LOAD_RANDOM(x, reg)
+#define RETGUARD_SETUP(x, reg)
+#define RETGUARD_CHECK(x, reg)
+#define RETGUARD_PUSH(reg)
+#define RETGUARD_POP(reg)
+#define RETGUARD_SYMBOL(x)
 #endif
 
 #define	_ENTRY(x)							\
@@ -129,5 +129,13 @@
 #define	SET_FAULT_HANDLER(handler, tmp)					\
 	ld	tmp, CI_CURPCB(tp);		/* Load the pcb */	\
 	sd	handler, PCB_ONFAULT(tmp)	/* Set the handler */
+
+#define	ENTER_USER_ACCESS(tmp)						\
+	li	tmp, SSTATUS_SUM;					\
+	csrs	sstatus, tmp
+
+#define	EXIT_USER_ACCESS(tmp)						\
+	li	tmp, SSTATUS_SUM;					\
+	csrc	sstatus, tmp
 
 #endif /* _MACHINE_ASM_H_ */
