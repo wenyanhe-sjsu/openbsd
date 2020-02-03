@@ -954,6 +954,7 @@ create_imagefile(int type, const char *imgfile_path, const char *base_path,
 int vm_getStats(uint32_t start_id, const char *name, enum actions action)
 {
 	get_info_vm(NULL, NULL, CMD_CONSOLE, NULL );
+	printf("CMPE vm_getStats ");
 	return 0;
 }
 
