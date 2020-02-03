@@ -85,6 +85,7 @@ extern struct pmap kernel_pmap_;
 #define pmap_kernel()   		(&kernel_pmap_)
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
+void pmap_kenter_cache(vaddr_t va, paddr_t pa, vm_prot_t prot, int cacheable);
 
 struct pv_entry;
 

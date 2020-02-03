@@ -492,6 +492,12 @@ pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot)
 	    (pa & PMAP_NOCACHE) ? PMAP_CACHE_CI : PMAP_CACHE_WB);
 }
 
+void
+pmap_kenter_pa_cache(vaddr_t va, paddr_t pa, vm_prot_t prot, int cacheable)
+{
+	pmap_kenter_pa_internal(va, pa, prot, prot, cacheable);
+}
+
 
 void
 pmap_kenter_pa_internal(vaddr_t va, paddr_t pa, vm_prot_t prot, int flags, int cache)
