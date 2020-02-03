@@ -976,13 +976,13 @@ get_num_vm(struct imsg *imsg, int *ret)
 		}
 		memcpy(&vir[ct], imsg->data, sizeof(struct vmop_info_result));
 		ct++;
-		printf("CMPE imsg counter - %z", ct); 
+		printf("CMPE imsg counter - %d", ct); 
 		*ret = 0;
 		return (ct);
 	}	
 	else {
 		*ret = EINVAL;
-		printf("CMPE imsg counter - %z", ct);
+		printf("CMPE imsg counter - %d", ct);
 		return (ct);
 	}
 }
