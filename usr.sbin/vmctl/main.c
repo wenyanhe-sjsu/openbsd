@@ -238,7 +238,7 @@ vmmaction(struct parse_result *res)
 	case CMD_STATUS:
 	case CMD_CONSOLE:
 	case CMD_STOPALL:
-		printf("CMPE - %s - %s -%d", res->name, &res->action, res->flags);
+		printf("CMPE - %s -%d", res->name, res->flags);
 		get_info_vm(res->id, res->name, res->action, res->flags);
 		break;
 	case CMD_LOAD:
