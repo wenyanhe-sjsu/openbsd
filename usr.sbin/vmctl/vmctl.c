@@ -951,7 +951,7 @@ create_imagefile(int type, const char *imgfile_path, const char *base_path,
 }
 
 // vmctl get memory status information from VMs
-int vm_getStats(uint32_t start_id, const char *name)
+int vm_getStats(uint32_t start_id, const char *name, enum actions action)
 {
 	get_info_vm(NULL, NULL, CMD_CONSOLE, NULL );
 	return 0;
@@ -976,13 +976,13 @@ get_num_vm(struct imsg *imsg, int *ret)
 		}
 		memcpy(&vir[ct], imsg->data, sizeof(struct vmop_info_result));
 		ct++;
-		printf("CMPE imsg counter - %d", ct); 
+		printf("CMPE imsg counter - %z", ct); 
 		*ret = 0;
 		return (ct);
 	}	
 	else {
 		*ret = EINVAL;
-		printf("CMPE imsg counter - %d", ct);
+		printf("CMPE imsg counter - %z", ct);
 		return (ct);
 	}
 }
