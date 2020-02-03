@@ -45,8 +45,8 @@
 #define QCOW2_FMT	"qcow2"
 
 static const char	*socket_name = SOCKET_NAME;
-static int		 ctl_sock = -1;
-static int		 tty_autoconnect = 0;
+static int		 	ctl_sock = -1;
+static int		 	tty_autoconnect = 0;
 
 __dead void	 usage(void);
 __dead void	 ctl_usage(struct ctl_command *);
@@ -343,7 +343,8 @@ vmmaction(struct parse_result *res)
 				done = unpause_vm_complete(&imsg, &ret);
 				break;
 			case CMD_GETSTATS:
-				done = get_num_vm(&imsg, &ret);
+				get_num_vm(&imsg, &ret);
+				done = 1;
 				break;
 			default:
 				done = 1;

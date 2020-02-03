@@ -960,11 +960,12 @@ int vm_getStats(uint32_t start_id, const char *name, enum actions action)
 
 // CMPE
 
-int
+void
 get_num_vm(struct imsg *imsg, int *ret)
 {
 	static size_t ct = 0;
 	static struct vmop_info_result *vir = NULL;
+	vm_counter = -1;
 
 	printf("CMPE imsg header type - %d", imsg->hdr.type); 
 
@@ -973,18 +974,18 @@ get_num_vm(struct imsg *imsg, int *ret)
 		    sizeof(struct vmop_info_result));
 		if (vir == NULL) {
 			*ret = ENOMEM;
-			return (1);
 		}
-		memcpy(&vir[ct], imsg->data, sizeof(struct vmop_info_result));
-		ct++;
-		printf("CMPE imsg counter - %zu", ct); 
-		*ret = 0;
-		return (ct);
+		else {
+			memcpy(&vir[ct], imsg->data, sizeof(struct vmop_info_result));
+			ct++;
+			*ret = 0;
+			vm_counter = ct;
+			printf("CMPE imsg after counter - %d", vm_counter); 
+		}		
 	}	
 	else {
-		*ret = EINVAL;
+		*ret = 0;
 		printf("CMPE imsg counter - %zu", ct);
-		return (ct);
 	}
 }
 

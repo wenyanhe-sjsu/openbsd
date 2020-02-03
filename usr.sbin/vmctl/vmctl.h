@@ -73,6 +73,7 @@ struct ctl_command {
 };
 
 struct imsgbuf	*ibuf;
+static int 		vm_counter = 0;
 
 /* main.c */
 int	 vmmaction(struct parse_result *);
