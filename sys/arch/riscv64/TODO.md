@@ -17,6 +17,11 @@ are physmap vars necessary in bootconfig.h ???
 
 DDB is completely unimplemented. Don't expect it to work.
 Look into implementing riscv64/cpufunc.c, if necessary
+
+
+Look into implementing riscv64/cpufunc.c, if necessary
+
+DDB is completely unimplemented. Don't expect it to work.
 PMAP is missing quite a few pieces (TLB Flush, etc.)
 Mainbus does not attach sub-devices. It should probably attach the "cpu" device
 

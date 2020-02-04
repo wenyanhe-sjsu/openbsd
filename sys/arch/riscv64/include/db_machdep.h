@@ -88,4 +88,3 @@ db_addr_t db_branch_taken(u_int inst, db_addr_t pc, db_regs_t *regs);
 #define DDB_STATE_EXITING	2
 
 #endif /* !_MACHINE_DB_MACHDEP_H_ */
-
