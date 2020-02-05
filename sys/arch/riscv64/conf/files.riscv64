@@ -22,6 +22,8 @@ file	arch/riscv64/riscv64/machdep.c
 file	arch/riscv64/riscv64/intr.c
 file	arch/riscv64/riscv64/pmap.c
 
+file	arch/riscv64/riscv64/pagezero.S
+
 file	arch/riscv64/riscv64/db_disasm.c	ddb
 file	arch/riscv64/riscv64/db_interface.c	ddb
 file	arch/riscv64/riscv64/db_trace.c	ddb

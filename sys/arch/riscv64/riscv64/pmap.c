@@ -766,7 +766,7 @@ pmap_zero_page(struct vm_page *pg)
 	vaddr_t va = zero_page + cpu_number() * PAGE_SIZE;
 
 	pmap_kenter_pa(va, pa, PROT_READ|PROT_WRITE);
-	pagezero_cache(va);
+	pagezero(va);
 	pmap_kremove_pg(va);
 }
 

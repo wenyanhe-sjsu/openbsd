@@ -79,7 +79,7 @@ extern paddr_t zero_page;
 extern paddr_t copy_src_page;
 extern paddr_t copy_dst_page;
 
-void pagezero_cache(vaddr_t);
+void pagezero(vaddr_t);
 
 extern struct pmap kernel_pmap_;
 #define pmap_kernel()   		(&kernel_pmap_)
