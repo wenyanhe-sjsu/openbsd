@@ -39,6 +39,9 @@ file	arch/riscv64/riscv64/cpu.c
 
 include "scsi/files.scsi"
 
+file	netinet/in_cksum.c
+file	netinet/in4_cksum.c
+
 #
 # XXX simplebus
 # XXX ofw
