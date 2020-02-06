@@ -727,6 +727,54 @@ pmap_pte_remove(struct pte_desc *pted, int remove_pted)
 	// ttlb_flush(pm, pted->pted_va);
 }
 
+/*
+ * activate a pmap entry
+ */
+void
+pmap_activate(struct proc *p)
+{
+	// XXX Write SATP CSR to set ASID + PPN
+#if 0
+	pmap_t pm = p->p_vmspace->vm_map.pmap;
+	int psw;
+
+	psw = disable_interrupts();
+	if (p == curproc && pm != curcpu()->ci_curpm)
+		pmap_setttb(p);
+	restore_interrupts(psw);
+#endif
+}
+
+/*
+ * deactivate a pmap entry
+ */
+void
+pmap_deactivate(struct proc *p)
+{
+}
+
+/*
+ * Get the physical page address for the given pmap/virtual address.
+ */
+boolean_t
+pmap_extract(pmap_t pm, vaddr_t va, paddr_t *pa)
+{
+	struct pte_desc *pted;
+
+	pted = pmap_vp_lookup(pm, va, NULL);
+
+	if (pted == NULL)
+		return FALSE;
+
+	if (pted->pted_pte == 0)
+		return FALSE;
+
+	if (pa != NULL)
+		*pa = (pted->pted_pte & PTE_RPGN) | (va & PAGE_MASK);
+
+	return TRUE;
+}
+
 void
 pmap_page_ro(pmap_t pm, vaddr_t va, vm_prot_t prot)
 {
@@ -766,7 +814,7 @@ pmap_zero_page(struct vm_page *pg)
 	vaddr_t va = zero_page + cpu_number() * PAGE_SIZE;
 
 	pmap_kenter_pa(va, pa, PROT_READ|PROT_WRITE);
-	pagezero_cache(va);
+	pagezero(va);
 	pmap_kremove_pg(va);
 }
 
@@ -1036,6 +1084,12 @@ pmap_unwire(pmap_t pm, vaddr_t va)
 		pm->pm_stats.wired_count--;
 		pted->pted_va &= ~PTED_VA_WIRED_M;
 	}
+}
+
+void
+pmap_remove_holes(struct vmspace *vm)
+{
+	/* NOOP */
 }
 
 void

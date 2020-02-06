@@ -28,7 +28,9 @@
 include <machine/frame.h>
 include <machine/pcb.h>
 include <machine/cpu.h>
+include <machine/param.h>
 
+export	PAGE_SIZE
 export	VM_MAXUSER_ADDRESS
 export	VM_MIN_KERNEL_ADDRESS
 
