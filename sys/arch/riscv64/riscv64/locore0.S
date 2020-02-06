@@ -1,14 +1,7 @@
+/* $OpenBSD: locore0.S,2019/10/31 mengshi.li.mars@gmail.com */
 /*-
- * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2012-2014 Andrew Turner
  * All rights reserved.
- *
- * Portions of this software were developed by SRI International and the
- * University of Cambridge Computer Laboratory under DARPA/AFRL contract
- * FA8750-10-C-0237 ("CTSRD"), as part of the DARPA CRASH research programme.
- *
- * Portions of this software were developed by the University of Cambridge
- * Computer Laboratory as part of the CTSRD Project, with support from the
- * UK Higher Education Innovation Fund (HEIF).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,28 +24,19 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD$
+ * $FreeBSD: head/sys/arm64/arm64/locore.S 282867 2015-05-13 18:57:03Z zbb $
  */
 
-#ifndef _MACHINE_BOOTCONFIG_H_
-#define	_MACHINE_BOOTCONFIG_H_
 
-struct riscv_bootparams {
-	vaddr_t		kern_l1pt;	/* Kernel L1 base */
-	vaddr_t		kern_phys;	/* Kernel base (physical) addr */
-	vaddr_t		kern_stack;
-	vaddr_t		dtbp_virt;	/* Device tree blob virtual addr */
-	vaddr_t		dtbp_phys;	/* Device tree blob physical addr */
-};
+#include <sys/syscall.h>
+#include <machine/asm.h>
+#include <machine/param.h>
+#include <machine/trap.h>
+#include <machine/riscvreg.h>
+#include <machine/pte.h>
 
-//#define RISCV_BOOTPARAMS_SIZE sizeof(struct riscv_bootparams)
-
-// XXX ???
-extern paddr_t physmap[];
-extern u_int physmap_idx;
-
-// XXX ???
-vaddr_t fake_preload_metadata(struct riscv_bootparams *rbp);
-void initriscv(struct riscv_bootparams *);
-
-#endif /* _MACHINE_BOOTCONFIG_H_ */
+	.text
+	.globl _start
+_start:
+	/* jump to locore.S _start_kern_bootstrap*/
+	j _start_kern_bootstrap 
