@@ -30,8 +30,8 @@
 #include <sys/param.h>
 
 #include <sys/proc.h>
+#include <sys/stacktrace.h>
 #include <sys/user.h>
-#include <riscv64/riscvreg.h>
 #include <machine/db_machdep.h>
 
 #include <ddb/db_access.h>
@@ -44,18 +44,6 @@ db_regs_t ddb_regs;
 
 #define INKERNEL(va)	(((vaddr_t)(va)) & (1ULL << 63))
 
-#ifndef __clang__
-/*
- * Clang uses a different stack frame, which looks like the following.
- *
- *          return link value       [fp, #+4]
- *          return fp value         [fp]        <- fp points to here
- *
- */
-#define FR_RFP	(0x0)
-#define FR_RLV	(0x4)
-#endif /* !__clang__ */
-
 void
 db_stack_trace_print(db_expr_t addr, int have_addr, db_expr_t count,
     char *modif, int (*pr)(const char *, ...))
@@ -64,7 +52,7 @@ db_stack_trace_print(db_expr_t addr, int have_addr, db_expr_t count,
 }
 
 void
-db_save_stack_trace(struct db_stack_trace *st)
+stacktrace_save(struct stacktrace *st)
 {
 	// XXX
 }
