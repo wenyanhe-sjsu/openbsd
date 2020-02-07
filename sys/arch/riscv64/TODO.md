@@ -27,3 +27,5 @@ Mainbus does not attach sub-devices. It should probably attach the "cpu" device
 
 Interrupts Unimplemented (intr.c)
 Interrupt diagnostics unimplemented (intr.h > splassert)
+
+machdep.c missing quite a few methods (should be obvious by linker errors)
