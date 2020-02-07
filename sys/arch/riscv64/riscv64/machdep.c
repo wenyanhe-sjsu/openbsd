@@ -24,7 +24,6 @@
 #include <sys/exec.h>
 #include <sys/user.h>
 #include <sys/conf.h>
-#include <sys/kcore.h>
 #include <sys/core.h>
 #include <sys/msgbuf.h>
 #include <sys/buf.h>
@@ -38,7 +37,6 @@
 #include <dev/ofw/fdt.h>
 #include <dev/ofw/openfirm.h>
 #include <machine/param.h>
-#include <machine/kcore.h>
 #include <machine/bootconfig.h>
 #include <machine/bus.h>
 
