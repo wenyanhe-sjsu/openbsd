@@ -62,8 +62,8 @@ process_read_regs(struct proc *p, struct reg *regs)
 	regs->r_tp = tf->tf_tp;//following Freebsd 
 	//regs->r_tp = (uint64_t)p->p_addr->u_pcb.pcb_tcb;//XXX why?
 	//XXX freebsd adds the following two fields so we just follow. 
-	regs->sepc = tf->tf_sepc;
-	regs->sstatus = tf->tf_sstatus;
+	regs->r_sepc = tf->tf_sepc;
+	regs->r_sstatus = tf->tf_sstatus;
 
 	return(0);
 }
