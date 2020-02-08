@@ -14,6 +14,7 @@ file	arch/riscv64/riscv64/autoconf.c
 file	arch/riscv64/riscv64/bus_space.c
 file	arch/riscv64/riscv64/clock.c
 file	arch/riscv64/riscv64/conf.c
+file	arch/riscv64/riscv64/cpu.c
 file	arch/riscv64/riscv64/disksubr.c		disk
 file	arch/riscv64/riscv64/locore.S
 file	arch/riscv64/riscv64/copyinout.S
