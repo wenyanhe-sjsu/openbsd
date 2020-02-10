@@ -34,6 +34,8 @@ export	PAGE_SIZE
 export	VM_MAXUSER_ADDRESS
 export	VM_MIN_KERNEL_ADDRESS
 
+export	SSTATUS_SUM
+
 struct	trapframe
 member	tf_ra
 member	tf_sp
