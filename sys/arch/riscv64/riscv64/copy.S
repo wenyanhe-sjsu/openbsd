@@ -73,9 +73,9 @@ ENTRY(copyin)
 END(copyin)
 
 /*
- * x0 = kernel space address
- * x1 = user space address
- * x2 = length
+ * a0 = kernel space address
+ * a1 = user space address
+ * a2 = length
  *
  * Copies bytes from kernel space to user space
  */
@@ -98,9 +98,9 @@ ENTRY(copyout)
 END(copyout)
 
 /*
- * x0 = kernel space source address
- * x1 = kernel space destination address
- * x2 = length
+ * a0 = kernel space source address
+ * a1 = kernel space destination address
+ * a2 = length
  *
  * Copies bytes from kernel space to kernel space, aborting on page fault
  */
