@@ -50,9 +50,3 @@ db_stack_trace_print(db_expr_t addr, int have_addr, db_expr_t count,
 {
 	// XXX
 }
-
-void
-stacktrace_save(struct stacktrace *st)
-{
-	// XXX
-}
