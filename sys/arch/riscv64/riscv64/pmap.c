@@ -1048,6 +1048,45 @@ pmap_init(void)
 }
 
 void
+pmap_postinit(void)
+{
+	// XXX pmap_postinit
+#if 0
+	extern char trampoline_vectors[];
+	paddr_t pa;
+	vaddr_t minaddr, maxaddr;
+	u_long npteds, npages;
+
+	memset(pmap_tramp.pm_vp.l1, 0, sizeof(struct pmapvp1));
+	pmap_extract(pmap_kernel(), (vaddr_t)trampoline_vectors, &pa);
+	pmap_enter(&pmap_tramp, (vaddr_t)trampoline_vectors, pa,
+	    PROT_READ | PROT_EXEC, PROT_READ | PROT_EXEC | PMAP_WIRED);
+
+	/*
+	 * Reserve enough virtual address space to grow the kernel
+	 * page tables.  We need a descriptor for each page as well as
+	 * an extra page for level 1/2/3 page tables for management.
+	 * To simplify the code, we always allocate full tables at
+	 * level 3, so take that into account.
+	 */
+	npteds = (VM_MAX_KERNEL_ADDRESS - pmap_maxkvaddr + 1) / PAGE_SIZE;
+	npteds = roundup(npteds, VP_IDX3_CNT);
+	npages = howmany(npteds, PAGE_SIZE / (sizeof(struct pte_desc)));
+	npages += 2 * howmany(npteds, VP_IDX3_CNT);
+	npages += 2 * howmany(npteds, VP_IDX3_CNT * VP_IDX2_CNT);
+	npages += 2 * howmany(npteds, VP_IDX3_CNT * VP_IDX2_CNT * VP_IDX1_CNT);
+
+	/*
+	 * Use an interrupt safe map such that we don't recurse into
+	 * uvm_map() to allocate map entries.
+	 */
+	minaddr = vm_map_min(kernel_map);
+	pmap_kvp_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+	    npages * PAGE_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
+#endif
+}
+
+void
 pmap_update(pmap_t pm)
 {
 	// XXX Optional Function

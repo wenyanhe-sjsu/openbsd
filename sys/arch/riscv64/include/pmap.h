@@ -91,6 +91,7 @@ struct pv_entry;
 
 /* investigate */
 #define pmap_unuse_final(p)		do { /* nothing */ } while (0)
+void pmap_postinit(void);
 
 #endif /* _KERNEL && !_LOCORE */
 
