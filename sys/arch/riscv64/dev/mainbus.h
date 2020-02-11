@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Patrick Wildt <patrick@blueri.se>
+ * Copyright (c) 2016 Patrick Wildt <patrick@blueri.se>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,10 +14,13 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#define	PT_STEP		(PT_FIRSTMACH + 0)
-#define	PT_GETREGS	(PT_FIRSTMACH + 1)
-#define	PT_SETREGS	(PT_FIRSTMACH + 2)
-#if 0  // XXX ptrace fpreg support
-#define	PT_GETFPREGS	(PT_FIRSTMACH + 3)
-#define	PT_SETFPREGS	(PT_FIRSTMACH + 4)
-#endif
+#ifndef __MAINBUS_H__
+#define __MAINBUS_H__
+
+/* Passed as third arg to attach functions. */
+union mainbus_attach_args {
+	const char		*ma_name;
+	struct fdt_attach_args	 ma_faa;
+};
+
+#endif /* __MAINBUS_H__ */

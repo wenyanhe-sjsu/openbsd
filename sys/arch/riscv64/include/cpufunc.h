@@ -22,36 +22,34 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD: head/sys/cpu/include/cpufunc.h 299683 2016-05-13 16:03:50Z andrew $
  */
 
-#include <sys/cdefs.h>
-#include <sys/param.h>
-#include <sys/systm.h>
+#ifndef	_MACHINE_CPUFUNC_H_
+#define	_MACHINE_CPUFUNC_H_
 
-int
-copystr(const void * __restrict kfaddr, void * __restrict kdaddr, size_t len,
-    size_t * __restrict lencopied)
-{
-	const char *src;
-	size_t pos;
-	char *dst;
-	int error;
+#ifdef _KERNEL
 
-	error = ENAMETOOLONG;
-	src = kfaddr;
-	dst = kdaddr;
-	for (pos = 0; pos < len; pos++) {
-		dst[pos] = src[pos];
-		if (src[pos] == '\0') {
-			/* Increment pos to hold the number of bytes copied */
-			pos++;
-			error = 0;
-			break;
-		}
-	}
+#include <machine/riscvreg.h>
 
-	if (lencopied != NULL)
-		*lencopied = pos;
+extern int64_t dcache_line_size;
+extern int64_t icache_line_size;
+extern int64_t idcache_line_size;
+extern int64_t dczva_line_size;
 
-	return (error);
-}
+void cpu_setttb(int, paddr_t);
+void cpu_tlb_flush(void);
+void cpu_tlb_flush_asid(vaddr_t);
+void cpu_tlb_flush_all_asid(vaddr_t);
+void cpu_tlb_flush_asid_all(vaddr_t);
+void cpu_icache_sync_range(vaddr_t, vsize_t);
+void cpu_idcache_wbinv_range(vaddr_t, vsize_t);
+void cpu_dcache_wbinv_range(vaddr_t, vsize_t);
+void cpu_dcache_inv_range(vaddr_t, vsize_t);
+void cpu_dcache_wb_range(vaddr_t, vsize_t);
+
+register_t smc_call(register_t, register_t, register_t, register_t);
+
+#endif	/* _KERNEL */
+#endif	/* _MACHINE_CPUFUNC_H_ */

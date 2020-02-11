@@ -47,6 +47,8 @@ struct riscv_bootparams {
 
 //#define RISCV_BOOTPARAMS_SIZE sizeof(struct riscv_bootparams)
 
+extern char *boot_file;
+
 // XXX ???
 extern paddr_t physmap[];
 extern u_int physmap_idx;

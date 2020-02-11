@@ -126,9 +126,15 @@
 	.weak alias;						\
 	.set alias,sym
 
-#define	SET_FAULT_HANDLER(handler, tmp)					\
-	ld	tmp, CI_CURPCB(tp);		/* Load the pcb */	\
-	sd	handler, PCB_ONFAULT(tmp)	/* Set the handler */
+#define	SWAP_FAULT_HANDLER(handler, tmp0, tmp1)			\
+	ld	tmp0, CI_CURPCB(tp);		/* Load the pcb */	\
+	ld	tmp1, PCB_ONFAULT(tmp0);	/* Save old handler */	\
+	sd	handler, PCB_ONFAULT(tmp0);	/* Set the handler */	\
+	mv	handler, tmp1
+
+#define	SET_FAULT_HANDLER(handler, pcb)					\
+	ld	pcb, CI_CURPCB(tp);		/* Load the pcb */	\
+	sd	handler, PCB_ONFAULT(pcb)	/* Set the handler */
 
 #define	ENTER_USER_ACCESS(tmp)						\
 	li	tmp, SSTATUS_SUM;					\

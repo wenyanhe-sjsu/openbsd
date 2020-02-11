@@ -27,8 +27,7 @@
 
 #include "machine/vmparam.h"
 #include "machine/pmap.h"
-// XXX machine/cpufunc.h
-// #include "machine/cpufunc.h"
+#include "machine/cpufunc.h"
 #include "machine/pcb.h"
 
 #include <machine/db_machdep.h>
@@ -493,7 +492,7 @@ pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot)
 }
 
 void
-pmap_kenter_pa_cache(vaddr_t va, paddr_t pa, vm_prot_t prot, int cacheable)
+pmap_kenter_cache(vaddr_t va, paddr_t pa, vm_prot_t prot, int cacheable)
 {
 	pmap_kenter_pa_internal(va, pa, prot, prot, cacheable);
 }
@@ -640,6 +639,48 @@ pmap_fill_pte(pmap_t pm, vaddr_t va, paddr_t pa, struct pte_desc *pted,
 
 	pted->pted_pte = pa & PTE_RPGN;
 	pted->pted_pte |= flags & (PROT_READ|PROT_WRITE|PROT_EXEC);
+}
+
+void
+pmap_proc_iflush(struct process *pr, vaddr_t va, vsize_t len)
+{
+	struct pmap *pm = vm_map_pmap(&pr->ps_vmspace->vm_map);
+	vaddr_t kva = zero_page + cpu_number() * PAGE_SIZE;
+	paddr_t pa;
+	vsize_t clen;
+	vsize_t off;
+
+	/*
+	 * If we're caled for the current processes, we can simply
+	 * flush the data cache to the point of unification and
+	 * invalidate the instruction cache.
+	 */
+	if (pr == curproc->p_p) {
+		cpu_icache_sync_range(va, len);
+		return;
+	}
+
+	/*
+	 * Flush and invalidate through an aliased mapping.  This
+	 * assumes the instruction cache is PIPT.  That is only true
+	 * for some of the hardware we run on.
+	 */
+	while (len > 0) {
+		/* add one to always round up to the next page */
+		clen = round_page(va + 1) - va;
+		if (clen > len)
+			clen = len;
+
+		off = va - trunc_page(va);
+		if (pmap_extract(pm, trunc_page(va), &pa)) {
+			pmap_kenter_pa(kva, pa, PROT_READ|PROT_WRITE);
+			cpu_icache_sync_range(kva + off, clen);
+			pmap_kremove_pg(kva);
+		}
+
+		len -= clen;
+		va += clen;
+	}
 }
 
 void
