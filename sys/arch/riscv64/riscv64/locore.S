@@ -254,6 +254,32 @@ sigfillsiz:
 	.data
 	.quad	esigfill - sigfill
 
+ENTRY(sigcode)
+       mv      a0, sp
+       addi    a0, a0, SF_SC //actual saved context
+
+1:
+       li      t0, SYS_sigreturn
+       ecall  //make a system call from a lower privilege level to a higher mode
+
+       /* sigreturn failed, exit */
+       li      t0, SYS_exit
+       ecall
+
+       j       1b
+END(sigcode)
+       /* This may be copied to the stack, keep it 16-byte aligned */
+       .align  3
+esigcode:
+
+       .data
+       .align  3
+
+       .global szsigcode
+szsigcode:
+       .quad   esigcode - sigcode
+
+
 	.align	12
 pagetable_l1:
 	.space	PAGE_SIZE
