@@ -91,10 +91,12 @@ struct cpu_info cpu_info_primary;
 struct cpu_info *cpu_info[MAXCPUS] = { &cpu_info_primary };
 
 //copied from arm64 directly
+#if 0
 extern void	com_fdt_init_cons(void);
 extern void	imxuart_init_cons(void);
 extern void	pluart_init_cons(void);
 extern void	simplefb_init_cons(bus_space_tag_t);
+#endif
 
 void
 consinit(void)
@@ -106,10 +108,13 @@ consinit(void)
 
 	consinit_called = 1;
 
+//XXX TODO: need to check how to reference them
+#if 0
 	com_fdt_init_cons();
 	imxuart_init_cons();
 	pluart_init_cons();
 	simplefb_init_cons(&riscv64_bs_tag);
+#endif
 }
 
 void
@@ -219,3 +224,26 @@ cpu_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
 	}
 	/* NOTREACHED */
 }
+
+//Copied from ARM64, removed some registers. XXX
+void
+setregs(struct proc *p, struct exec_package *pack, u_long stack,
+    register_t *retval)
+{
+	struct trapframe *tf;
+
+	/* If we were using the FPU, forget about it. */
+	if (p->p_addr->u_pcb.pcb_fpcpu != NULL)
+		//vfp_discard(p);//XXX ignore fp so far
+	p->p_addr->u_pcb.pcb_flags &= ~PCB_FPU;
+
+	tf = p->p_addr->u_pcb.pcb_tf;
+
+	memset (tf,0, sizeof(*tf));
+	tf->tf_sp = stack;
+	tf->tf_ra = pack->ep_entry;
+	tf->tf_gp = pack->ep_entry; //XXX 
+
+	retval[1] = 0;
+}
+
