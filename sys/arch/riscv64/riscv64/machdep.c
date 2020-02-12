@@ -24,6 +24,7 @@
 #include <sys/exec.h>
 #include <sys/user.h>
 #include <sys/conf.h>
+#include <sys/kcore.h>
 #include <sys/core.h>
 #include <sys/msgbuf.h>
 #include <sys/buf.h>
@@ -246,4 +247,73 @@ setregs(struct proc *p, struct exec_package *pack, u_long stack,
 
 	retval[1] = 0;
 }
+/// XXX ?
+/*
+ * Size of memory segments, before any memory is stolen.
+ */
+phys_ram_seg_t mem_clusters[VM_PHYSSEG_MAX];
+int     mem_cluster_cnt;
+/// XXX ?
+/*
+ * cpu_dumpsize: calculate size of machine-dependent kernel core dump headers.
+ */
+int
+cpu_dumpsize(void)
+{
+	int size;
 
+	size = ALIGN(sizeof(kcore_seg_t)) +
+	    ALIGN(mem_cluster_cnt * sizeof(phys_ram_seg_t));
+	if (roundup(size, dbtob(1)) != dbtob(1))
+		return (-1);
+
+	return (1);
+}
+
+u_long
+cpu_dump_mempagecnt()
+{
+	return 0;
+}
+
+//Copied from ARM64
+/*
+ * These variables are needed by /sbin/savecore
+ */
+u_long	dumpmag = 0x8fca0101;	/* magic number */
+int 	dumpsize = 0;		/* pages */
+long	dumplo = 0; 		/* blocks */
+
+/*
+ * This is called by main to set dumplo and dumpsize.
+ * Dumps always skip the first PAGE_SIZE of disk space
+ * in case there might be a disk label stored there.
+ * If there is extra space, put dump at the end to
+ * reduce the chance that swapping trashes it.
+ */
+void
+dumpconf(void)
+{
+	int nblks, dumpblks;	/* size of dump area */
+
+	if (dumpdev == NODEV ||
+	    (nblks = (bdevsw[major(dumpdev)].d_psize)(dumpdev)) == 0)
+		return;
+	if (nblks <= ctod(1))
+		return;
+
+	dumpblks = cpu_dumpsize();
+	if (dumpblks < 0)
+		return;
+	dumpblks += ctod(cpu_dump_mempagecnt());
+
+	/* If dump won't fit (incl. room for possible label), punt. */
+	if (dumpblks > (nblks - ctod(1)))
+		return;
+
+	/* Put dump at end of partition */
+	dumplo = nblks - dumpblks;
+
+	/* dumpsize is in page units, and doesn't include headers. */
+	dumpsize = cpu_dump_mempagecnt();
+}
