@@ -238,7 +238,7 @@ va:					//XXX just a trampoline?
 
 	mv	a0, sp				//stack setup, can call C now!
 	call	_C_LABEL(initriscv)	/* Off we go */	//XXX defined in machdep.c
-	call	_C_LABEL(mi_startup)			//XXX defined in freebsd/kern/init_main.c
+	call	_C_LABEL(main)			//defined in openbsd/kern/init_main.c
 
 	.align  4
 initstack:
