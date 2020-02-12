@@ -31,3 +31,5 @@ Interrupt diagnostics unimplemented (intr.h > splassert)
 machdep.c missing quite a few methods (should be obvious by linker errors)
 
 switchframe not being initialized on cpu_fork
+
+child_return logic is best-guess. Consider re-evaluting at later point in time
