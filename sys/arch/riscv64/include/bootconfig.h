@@ -45,8 +45,6 @@ struct riscv_bootparams {
 	vaddr_t		dtbp_phys;	/* Device tree blob physical addr */
 };
 
-//#define RISCV_BOOTPARAMS_SIZE sizeof(struct riscv_bootparams)
-
 extern char *boot_file;
 
 // XXX ???

@@ -41,7 +41,4 @@ struct pcb {
 
 	void		*pcb_tcb;
 };
-
-//#define PCB_SIZE sizeof(struct pcb)
-
 #endif	/* _MACHINE_PCB_H_ */

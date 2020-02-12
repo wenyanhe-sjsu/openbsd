@@ -27,7 +27,7 @@
  * $FreeBSD: head/sys/arm64/arm64/locore.S 282867 2015-05-13 18:57:03Z zbb $
  */
 
-
+#include <assym.h>
 #include <sys/syscall.h>
 #include <machine/asm.h>
 #include <machine/param.h>
@@ -156,11 +156,11 @@ _start_kern_bootstrap:
 	lla	s1, pagetable_l2_devmap
 	
 	//calc PTE based on pa
-	mv	s2, a1					//passed by bbl
+	mv	s2, a1			//passed by bbl
 	srli	s2, s2, PAGE_SHIFT	//12
 	slli	t2, s2, PTE_PPN0_S	/* << PTE_PPN0_S */ //10,	
 	li	t0, (PTE_KERN)
-	or	t0, t0, t2			//PTE contructed
+	or	t0, t0, t2		//PTE contructed
 
 	/* Store PTE entry to position */
 	li	a6, PTE_SIZE	
@@ -173,16 +173,16 @@ _start_kern_bootstrap:
 
 
 	/* Setup supervisor trap vector */ //Supervisor Trap Vector Base Address
-	lla	t0, va						//loading a physical addr, va defined below
-	sub	t0, t0, s9					//offset comparing to phymem base
-	li	t1, KERNBASE				//virt addr		
-	add	t0, t0, t1					//
-	csrw	stvec, t0				//virt addr
+	lla	t0, va			//loading a physical addr, va defined below
+	sub	t0, t0, s9		//offset comparing to phymem base
+	li	t1, KERNBASE		//virt addr		
+	add	t0, t0, t1		//
+	csrw	stvec, t0		//virt addr
 
 	/* Set page tables base register */
-	lla	s2, pagetable_l1			//pa
-	srli	s2, s2, PAGE_SHIFT		//12, --> PPN 
-	li	t0, SATP_MODE_SV39			//satp[63:60] = 1000b, enable paging! 
+	lla	s2, pagetable_l1	//pa
+	srli	s2, s2, PAGE_SHIFT	//12, --> PPN 
+	li	t0, SATP_MODE_SV39	//satp[63:60] = 1000b, enable paging! 
 	or	s2, s2, t0
 	sfence.vma			//Supervisor Fence for Virtual Memory, to flush TLB
 	csrw	satp, s2
@@ -208,8 +208,7 @@ va:					//XXX just a trampoline?
 	mv	sp, s3
 	
 	/* Allocate space for thread0 PCB and riscv_bootparams */
-	//addi	sp, sp, -(PCB_SIZE + RISCV_BOOTPARAMS_SIZE) & ~STACKALIGNBYTES
-	addi	sp, sp, -100 //XXX need to resolve PCB_SIZE and RISCV_BOOTPARAMS_SIZE
+	addi	sp, sp, -(PCB_SIZEOF + RISCV_BOOTPARAMS_SIZEOF) & ~STACKALIGNBYTES
 
 	/* Clear BSS */
 	la	s0, _C_LABEL(__bss_start)	//XXX not found in code, determined by linker?
@@ -219,10 +218,10 @@ va:					//XXX just a trampoline?
 	addi	s0, s0, 8
 	bltu	s0, s1, 1b
 
-#ifdef SMP			//Symmetric Multiprocessing, defined in /config/GENERIC ??
+#ifdef SMP			//Symmetric Multiprocessing, XXX defined in /config/GENERIC?
 	/* Store boot hart id. */
-	la	t0, boot_hart		//defined in machdep.c, the hart we booted on.
-	sw	a0, 0(t0)			//all above logic runs on this a0 hart.
+	la	t0, boot_hart	//XXX defined in machdep.c, the hart we booted on.
+	sw	a0, 0(t0)	//all above logic runs on this a0 hart.
 #endif
 
 	/* Fill riscv_bootparams */
@@ -240,8 +239,8 @@ va:					//XXX just a trampoline?
 	sd	a1, 32(sp) /* dtbp_phys */		//5
 
 	mv	a0, sp				//stack setup, can call C now!
-	call	_C_LABEL(initriscv)	/* Off we go */	//defined in machdep.c
-	call	_C_LABEL(mi_startup)				//defined in freebsd/kern/init_main.c
+	call	_C_LABEL(initriscv)	/* Off we go */	//XXX defined in machdep.c
+	call	_C_LABEL(mi_startup)			//XXX defined in freebsd/kern/init_main.c
 
 	.align  4
 initstack:
@@ -250,8 +249,7 @@ initstack_end:
 
 ENTRY(sigcode)
 	mv	a0, sp
-	//addi	a0, a0, SF_UC //XXX need to resolve SF_UC
-	addi	a0, a0, 100//XXX need to resolve SF_UC
+	addi	a0, a0, SF_SC //actual saved context
 
 1:
 	li	t0, SYS_sigreturn
@@ -308,33 +306,33 @@ ENTRY(mpentry)
 	 * Calculate the offset to __riscv_boot_ap
 	 * for the current core, cpuid is in a0.
 	 */
-	li	t1, 4					//t1 = 4, each core occupies a word
-	mulw	t1, t1, a0			//t1 = a0*4, offset in Bytes for #a0 core
+	li	t1, 4			//t1 = 4, each core occupies a word
+	mulw	t1, t1, a0		//t1 = a0*4, offset in Bytes for #a0 core
 	/* Get the pointer */
 	lla	t0, __riscv_boot_ap	//mp_machdep.c, t0 = base addr for all cores		
-	add	t0, t0, t1			//t0 = starting addr for current core
+	add	t0, t0, t1		//t0 = starting addr for current core
 
 1:
 	/* Wait the kernel to be ready */
-	lw	t1, 0(t0)				//when kernel is ready, 0(t0) should NOT euqal 0
+	lw	t1, 0(t0)			//when kernel is ready, 0(t0) should NOT euqal 0
 	beqz	t1, 1b				//see __riscv_boot_ap
 
 	/* Setup stack pointer */	//now kernel is ready
 	lla	t0, secondary_stacks  //mp_machdep.c. pa, size: #core x #pages/kernel x pg_size
-	li	t1, (PAGE_SIZE * KSTACK_PAGES)		// size of kernel stack for one core
-	mulw	t2, t1, a0				//offset for this hart
-	add	t0, t0, t2					//end of stack for this hart
-	add	t0, t0, t1					//start of stack for this hart
-	sub	t0, t0, s9					//s9 is phymem base, t0 is now relative addr 
-	li	t1, KERNBASE				//t1 is virtual addr
-	add	sp, t0, t1					//now sp is set to the right virtual address.
+	li	t1, (PAGE_SIZE * KSTACK_PAGES)	// size of kernel stack for one core
+	mulw	t2, t1, a0			//offset for this hart
+	add	t0, t0, t2			//end of stack for this hart
+	add	t0, t0, t1			//start of stack for this hart
+	sub	t0, t0, s9			//s9 is phymem base, t0 is now relative addr 
+	li	t1, KERNBASE			//t1 is virtual addr
+	add	sp, t0, t1			//now sp is set to the right virtual address.
 
 	/* Setup supervisor trap vector */
 	lla	t0, mpva			//mpva is phymem addr of the handler array
 	sub	t0, t0, s9			//get the relative addr
 	li	t1, KERNBASE
 	add	t0, t0, t1			//get the virtual addr
-	csrw	stvec, t0		//set the CSR
+	csrw	stvec, t0			//set the CSR
 
 	/* Set page tables base register */
 	lla	s2, pagetable_l1
@@ -353,7 +351,7 @@ mpva:
 .option pop
 
 	/* Setup supervisor trap vector */
-	la	t0, cpu_exception_handler	//defined in freebsd/machine/excpetion.S
+	la	t0, cpu_exception_handler	//XXX defined in freebsd/machine/excpetion.S
 	csrw	stvec, t0
 
 	/* Ensure sscratch is zero */

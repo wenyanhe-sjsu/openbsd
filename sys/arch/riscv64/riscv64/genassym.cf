@@ -29,10 +29,11 @@ include <machine/frame.h>
 include <machine/pcb.h>
 include <machine/cpu.h>
 include <machine/param.h>
+include <machine/bootconfig.h>
 
 export	PAGE_SIZE
-export	VM_MAXUSER_ADDRESS
-export	VM_MIN_KERNEL_ADDRESS
+# export	VM_MAXUSER_ADDRESS
+# export	VM_MIN_KERNEL_ADDRESS
 
 export	SSTATUS_SUM
 
@@ -48,6 +49,11 @@ member	tf_sepc
 member	tf_sstatus
 member	tf_stval
 member	tf_scause
+
+struct	sigframe
+member	sf_signum
+member	sf_sc
+member	sf_si
 
 struct	pcb
 member	pcb_flags
@@ -83,5 +89,12 @@ endif
 ifdef GPROF
 member	ci_gmon
 endif
+
+struct	riscv_bootparams
+member	kern_l1pt
+member	kern_phys
+member	kern_stack
+member	dtbp_virt
+member	dtbp_phys
 
 
