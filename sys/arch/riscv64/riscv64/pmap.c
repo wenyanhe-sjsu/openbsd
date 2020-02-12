@@ -655,10 +655,11 @@ pmap_proc_iflush(struct process *pr, vaddr_t va, vsize_t len)
 	 * flush the data cache to the point of unification and
 	 * invalidate the instruction cache.
 	 */
-	if (pr == curproc->p_p) {
-		cpu_icache_sync_range(va, len);
-		return;
-	}
+	// XXX Sync Instruction Cache
+	// if (pr == curproc->p_p) {
+	// 	cpu_icache_sync_range(va, len);
+	// 	return;
+	// }
 
 	/*
 	 * Flush and invalidate through an aliased mapping.  This
@@ -674,7 +675,8 @@ pmap_proc_iflush(struct process *pr, vaddr_t va, vsize_t len)
 		off = va - trunc_page(va);
 		if (pmap_extract(pm, trunc_page(va), &pa)) {
 			pmap_kenter_pa(kva, pa, PROT_READ|PROT_WRITE);
-			cpu_icache_sync_range(kva + off, clen);
+			// XXX Sync Instruction Cache
+			// cpu_icache_sync_range(kva + off, clen);
 			pmap_kremove_pg(kva);
 		}
 
