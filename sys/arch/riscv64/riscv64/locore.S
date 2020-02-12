@@ -277,14 +277,8 @@ _C_LABEL(sigcoderet):
 END(sigcode)
        /* This may be copied to the stack, keep it 16-byte aligned */
        .align  3
-esigcode:
-
-       .data
-       .align  3
-
-       .global szsigcode
-szsigcode:
-       .quad   esigcode - sigcode
+       .globl _C_LABEL(esigcode)
+_C_LABEL(esigcode):
 
 
 	.align	12
