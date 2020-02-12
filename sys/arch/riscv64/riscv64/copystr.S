@@ -18,6 +18,9 @@
 
 #include "assym.h"
 #include <machine/asm.h>
+#include <machine/param.h>
+#include <machine/vmparam.h>
+#include <machine/riscvreg.h>
 #include <sys/errno.h>
 
 	.text

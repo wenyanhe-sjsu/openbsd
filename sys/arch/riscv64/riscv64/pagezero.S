@@ -27,6 +27,7 @@
  */
 
 #include <machine/asm.h>
+#include <machine/param.h>
 
 #include "assym.h"
 
