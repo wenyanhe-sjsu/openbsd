@@ -25,6 +25,7 @@ file	arch/riscv64/riscv64/pmap.c
 file	arch/riscv64/riscv64/mem.c
 file	arch/riscv64/riscv64/process_machdep.c
 file	arch/riscv64/riscv64/vm_machdep.c
+file	arch/riscv64/riscv64/sig_machdep.c
 file	arch/riscv64/riscv64/support.S
 file	arch/riscv64/riscv64/pagezero.S
 file	arch/riscv64/riscv64/trap.c
