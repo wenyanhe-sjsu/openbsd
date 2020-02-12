@@ -261,10 +261,17 @@ ENTRY(sigcode)
 1:
        li      t0, SYS_sigreturn
        ecall  //make a system call from a lower privilege level to a higher mode
+	
+       .globl _C_LABEL(sigcoderet)
+_C_LABEL(sigcoderet):
+       nop
+       nop
 
        /* sigreturn failed, exit */
        li      t0, SYS_exit
        ecall
+       nop
+       nop
 
        j       1b
 END(sigcode)
