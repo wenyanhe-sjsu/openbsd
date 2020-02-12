@@ -35,8 +35,6 @@
 #include <machine/trap.h>
 #include <machine/riscvreg.h>
 #include <machine/pte.h>
-//#include <machine/pcb.h>
-//#include <machine/bootconfig.h>
 
 
 	.globl	kernbase
