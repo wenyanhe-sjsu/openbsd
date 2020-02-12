@@ -39,6 +39,7 @@
 #include <machine/param.h>
 #include <machine/bootconfig.h>
 #include <machine/bus.h>
+#include <machine/riscv64var.h>
 
 #include <machine/db_machdep.h>
 #include <ddb/db_extern.h>
@@ -88,6 +89,28 @@ int safepri = 0;
 
 struct cpu_info cpu_info_primary;
 struct cpu_info *cpu_info[MAXCPUS] = { &cpu_info_primary };
+
+//copied from arm64 directly
+extern void	com_fdt_init_cons(void);
+extern void	imxuart_init_cons(void);
+extern void	pluart_init_cons(void);
+extern void	simplefb_init_cons(bus_space_tag_t);
+
+void
+consinit(void)
+{
+	static int consinit_called = 0;
+
+	if (consinit_called != 0)
+		return;
+
+	consinit_called = 1;
+
+	com_fdt_init_cons();
+	imxuart_init_cons();
+	pluart_init_cons();
+	simplefb_init_cons(&riscv64_bs_tag);
+}
 
 void
 cpu_idle_enter()
