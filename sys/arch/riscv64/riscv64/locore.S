@@ -281,6 +281,11 @@ END(sigcode)
 _C_LABEL(esigcode):
 
 
+	.data
+	.global _C_LABEL(esym)
+_C_LABEL(esym): .quad	_C_LABEL(end)
+
+
 	.align	12
 pagetable_l1:
 	.space	PAGE_SIZE
