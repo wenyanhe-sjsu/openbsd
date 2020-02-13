@@ -247,6 +247,20 @@ setregs(struct proc *p, struct exec_package *pack, u_long stack,
 
 	retval[1] = 0;
 }
+
+void
+need_resched(struct cpu_info *ci)
+{
+	ci->ci_want_resched = 1;
+
+	/* There's a risk we'll be called before the idle threads start */
+	if (ci->ci_curproc) {
+		aston(ci->ci_curproc);
+		cpu_kick(ci);
+	}
+}
+
+
 /// XXX ?
 /*
  * Size of memory segments, before any memory is stolen.
