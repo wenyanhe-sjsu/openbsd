@@ -9,7 +9,7 @@
 .include <bsd.own.mk>
 
 SIZE?=	size
-STRIP?=	ctfstrip
+STRIP?= /usr/local/riscv/bin/llvm-strip	
 
 # source tree is located via $S relative to the compilation directory
 .ifndef S
