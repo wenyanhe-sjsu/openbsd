@@ -19,6 +19,8 @@
 #include "assym.h"
 #include <sys/syscall.h>
 #include <machine/asm.h>
+#include <machine/vmparam.h>
+#include <machine/riscvreg.h>
 #include <sys/errno.h>
 
 

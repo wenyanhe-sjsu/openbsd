@@ -18,6 +18,9 @@
 
 #include "assym.h"
 #include <machine/asm.h>
+#include <machine/param.h>
+#include <machine/vmparam.h>
+#include <machine/riscvreg.h>
 #include <sys/errno.h>
 
 	.text
@@ -45,7 +48,7 @@ ENTRY(copystr)
 	addi	a1, a1, 1
 	addi	a2, a2, -1
 	addi	a5, a5, 1
-	beqz	t0, .lcopyiostrsuccess
+	beqz	t0, .Lcopyiostrsuccess
 	bnez	a2, 1b
 
 .Lcopyiostrtoolong_user:

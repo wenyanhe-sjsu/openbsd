@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2015-2020 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -30,29 +30,58 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#ifndef _MACHINE_BOOTCONFIG_H_
-#define	_MACHINE_BOOTCONFIG_H_
+#include "assym.h"
+#include <machine/asm.h>
+#include <machine/setjmp.h>
 
-struct riscv_bootparams {
-	vaddr_t		kern_l1pt;	/* Kernel L1 base */
-	vaddr_t		kern_phys;	/* Kernel base (physical) addr */
-	vaddr_t		kern_stack;
-	vaddr_t		dtbp_virt;	/* Device tree blob virtual addr */
-	vaddr_t		dtbp_phys;	/* Device tree blob physical addr */
-};
+ENTRY(setjmp)
+	/* Store the stack pointer */
+	sd	sp, 0(a0)
+	addi	a0, a0, 8
 
-extern char *boot_file;
+	/* Store the general purpose registers and ra */
+	sd	s0, (0 * 8)(a0)
+	sd	s1, (1 * 8)(a0)
+	sd	s2, (2 * 8)(a0)
+	sd	s3, (3 * 8)(a0)
+	sd	s4, (4 * 8)(a0)
+	sd	s5, (5 * 8)(a0)
+	sd	s6, (6 * 8)(a0)
+	sd	s7, (7 * 8)(a0)
+	sd	s8, (8 * 8)(a0)
+	sd	s9, (9 * 8)(a0)
+	sd	s10, (10 * 8)(a0)
+	sd	s11, (11 * 8)(a0)
+	sd	ra, (12 * 8)(a0)
 
-// XXX ???
-extern paddr_t physmap[];
-extern u_int physmap_idx;
+	/* Return value */
+	li	a0, 0
+	ret
+END(setjmp)
 
-// XXX ???
-vaddr_t fake_preload_metadata(struct riscv_bootparams *rbp);
-void initriscv(struct riscv_bootparams *);
+ENTRY(longjmp)
+	/* Restore the stack pointer */
+	ld	sp, 0(a0)
+	addi	a0, a0, 8
 
-#endif /* _MACHINE_BOOTCONFIG_H_ */
+	/* Restore the general purpose registers and ra */
+	ld	s0, (0 * 8)(a0)
+	ld	s1, (1 * 8)(a0)
+	ld	s2, (2 * 8)(a0)
+	ld	s3, (3 * 8)(a0)
+	ld	s4, (4 * 8)(a0)
+	ld	s5, (5 * 8)(a0)
+	ld	s6, (6 * 8)(a0)
+	ld	s7, (7 * 8)(a0)
+	ld	s8, (8 * 8)(a0)
+	ld	s9, (9 * 8)(a0)
+	ld	s10, (10 * 8)(a0)
+	ld	s11, (11 * 8)(a0)
+	ld	ra, (12 * 8)(a0)
+
+	/* Load the return value */
+	mv	a0, a1
+	ret
+END(longjmp)

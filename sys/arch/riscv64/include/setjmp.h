@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -34,25 +34,30 @@
  * $FreeBSD$
  */
 
-#ifndef _MACHINE_BOOTCONFIG_H_
-#define	_MACHINE_BOOTCONFIG_H_
+#ifndef _MACHINE_SETJMP_H_
+#define	_MACHINE_SETJMP_H_
 
-struct riscv_bootparams {
-	vaddr_t		kern_l1pt;	/* Kernel L1 base */
-	vaddr_t		kern_phys;	/* Kernel base (physical) addr */
-	vaddr_t		kern_stack;
-	vaddr_t		dtbp_virt;	/* Device tree blob virtual addr */
-	vaddr_t		dtbp_phys;	/* Device tree blob physical addr */
-};
+#include <sys/cdefs.h>
 
-extern char *boot_file;
+#define	_JBLEN		63	/* sp, ra, [f]s0-11, magic val, sigmask */
+#define	_JB_SIGMASK	27
 
-// XXX ???
-extern paddr_t physmap[];
-extern u_int physmap_idx;
+#ifdef	__ASSEMBLER__
+#define	_JB_MAGIC__SETJMP	0xbe87fd8a2910af00
+#define	_JB_MAGIC_SETJMP	0xbe87fd8a2910af01
+#endif /* !__ASSEMBLER__ */
 
-// XXX ???
-vaddr_t fake_preload_metadata(struct riscv_bootparams *rbp);
-void initriscv(struct riscv_bootparams *);
+#ifndef	__ASSEMBLER__
+/*
+ * jmp_buf and sigjmp_buf are encapsulated in different structs to force
+ * compile-time diagnostics for mismatches.  The structs are the same
+ * internally to avoid some run-time errors for mismatches.
+ */
+#if __BSD_VISIBLE || __POSIX_VISIBLE || __XSI_VISIBLE
+typedef	struct _sigjmp_buf { long _sjb[_JBLEN + 1] __aligned(16); } sigjmp_buf[1];
+#endif
 
-#endif /* _MACHINE_BOOTCONFIG_H_ */
+typedef	struct _jmp_buf { long _jb[_JBLEN + 1] __aligned(16); } jmp_buf[1];
+#endif	/* __ASSEMBLER__ */
+
+#endif /* !_MACHINE_SETJMP_H_ */

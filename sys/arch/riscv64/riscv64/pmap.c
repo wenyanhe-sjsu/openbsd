@@ -655,10 +655,11 @@ pmap_proc_iflush(struct process *pr, vaddr_t va, vsize_t len)
 	 * flush the data cache to the point of unification and
 	 * invalidate the instruction cache.
 	 */
-	if (pr == curproc->p_p) {
-		cpu_icache_sync_range(va, len);
-		return;
-	}
+	// XXX Sync Instruction Cache
+	// if (pr == curproc->p_p) {
+	// 	cpu_icache_sync_range(va, len);
+	// 	return;
+	// }
 
 	/*
 	 * Flush and invalidate through an aliased mapping.  This
@@ -674,7 +675,8 @@ pmap_proc_iflush(struct process *pr, vaddr_t va, vsize_t len)
 		off = va - trunc_page(va);
 		if (pmap_extract(pm, trunc_page(va), &pa)) {
 			pmap_kenter_pa(kva, pa, PROT_READ|PROT_WRITE);
-			cpu_icache_sync_range(kva + off, clen);
+			// XXX Sync Instruction Cache
+			// cpu_icache_sync_range(kva + off, clen);
 			pmap_kremove_pg(kva);
 		}
 
@@ -1045,6 +1047,45 @@ pmap_init(void)
 	pool_setlowat(&pmap_pted_pool, 20);
 	pool_init(&pmap_vp_pool, sizeof(struct pmapvp0), PAGE_SIZE, IPL_VM, 0,
 	    "vp", &pmap_vp_allocator);
+}
+
+void
+pmap_postinit(void)
+{
+	// XXX pmap_postinit
+#if 0
+	extern char trampoline_vectors[];
+	paddr_t pa;
+	vaddr_t minaddr, maxaddr;
+	u_long npteds, npages;
+
+	memset(pmap_tramp.pm_vp.l1, 0, sizeof(struct pmapvp1));
+	pmap_extract(pmap_kernel(), (vaddr_t)trampoline_vectors, &pa);
+	pmap_enter(&pmap_tramp, (vaddr_t)trampoline_vectors, pa,
+	    PROT_READ | PROT_EXEC, PROT_READ | PROT_EXEC | PMAP_WIRED);
+
+	/*
+	 * Reserve enough virtual address space to grow the kernel
+	 * page tables.  We need a descriptor for each page as well as
+	 * an extra page for level 1/2/3 page tables for management.
+	 * To simplify the code, we always allocate full tables at
+	 * level 3, so take that into account.
+	 */
+	npteds = (VM_MAX_KERNEL_ADDRESS - pmap_maxkvaddr + 1) / PAGE_SIZE;
+	npteds = roundup(npteds, VP_IDX3_CNT);
+	npages = howmany(npteds, PAGE_SIZE / (sizeof(struct pte_desc)));
+	npages += 2 * howmany(npteds, VP_IDX3_CNT);
+	npages += 2 * howmany(npteds, VP_IDX3_CNT * VP_IDX2_CNT);
+	npages += 2 * howmany(npteds, VP_IDX3_CNT * VP_IDX2_CNT * VP_IDX1_CNT);
+
+	/*
+	 * Use an interrupt safe map such that we don't recurse into
+	 * uvm_map() to allocate map entries.
+	 */
+	minaddr = vm_map_min(kernel_map);
+	pmap_kvp_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+	    npages * PAGE_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
+#endif
 }
 
 void
