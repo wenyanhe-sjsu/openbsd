@@ -699,21 +699,17 @@ viomb_stats_intr(struct virtqueue *vq)
 {
 	struct virtio_softc *vsc = vq->vq_owner;
 	struct viomb_softc *sc = (struct viomb_softc *)vsc->sc_child;
-	//struct balloon_req *b;
-	struct stats_req *s;
-	//u_int64_t nvpages;
 
 	if (viomb_vq_dequeue(vq))
 		return(1);
 
+	bus_dmamap_sync(vsc->sc_dmat, sc->sc_stats_dmamap, 0,
+			VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat),
+			BUS_DMASYNC_POSTWRITE);
 
-	s = &sc->sc_stats;
-	viomb_read_config(sc);
+	sc->sc_stats_needs_update = 1;
 
-	/* if we have more work to do, add it to tasks list */
-	
-	// if (sc->sc_npages < sc->sc_actual)
-	// 	task_add(sc->sc_taskq, &sc->sc_task);
+	task_add(sc->sc_taskq, &sc->sc_task);
 
 	return(1);
 }
