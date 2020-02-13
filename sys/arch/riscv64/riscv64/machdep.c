@@ -30,6 +30,7 @@
 #include <sys/buf.h>
 #include <sys/termios.h>
 #include <sys/sensors.h>
+#include <sys/syscallargs.h>
 
 #include <net/if.h>
 #include <uvm/uvm.h>
@@ -397,4 +398,23 @@ dumpconf(void)
 
 	/* dumpsize is in page units, and doesn't include headers. */
 	dumpsize = cpu_dump_mempagecnt();
+}
+
+//copied from arm64/sys_machdep.h
+int
+sys_sysarch(struct proc *p, void *v, register_t *retval)
+{
+	struct sys_sysarch_args /* {
+		syscallarg(int) op;
+		syscallarg(void *) parms;
+	} */ *uap = v;
+	int error = 0;
+
+	switch(SCARG(uap, op)) {
+	default:
+		error = EINVAL;
+		break;
+	}
+
+	return (error);
 }
