@@ -418,3 +418,301 @@ sys_sysarch(struct proc *p, void *v, register_t *retval)
 
 	return (error);
 }
+
+
+void
+initriscv(struct riscv_bootparams *rbp)
+{
+	panic("initriscv: u think u can initialize me?");
+#if 0 //till end
+
+	vaddr_t vstart, vend;
+	struct cpu_info *pcpup;
+	long kvo = rbp->kern_delta;
+	//caddr_t kmdp;
+	paddr_t memstart, memend;
+	void *config = rbp->arg2;
+	void *fdt = NULL;
+	EFI_PHYSICAL_ADDRESS system_table = 0;
+	int (*map_func_save)(bus_space_tag_t, bus_addr_t, bus_size_t, int,
+	    bus_space_handle_t *);
+
+	// NOTE that 1GB of ram is mapped in by default in
+	// the bootstrap memory config, so nothing is necessary
+	// until pmap_bootstrap_finalize is called??
+	pmap_map_early((paddr_t)config, PAGE_SIZE);
+	if (!fdt_init(config) || fdt_get_size(config) == 0)
+	pmap_map_early((paddr_t)config, round_page(fdt_get_size(config)));
+
+	struct fdt_reg reg;
+	void *node;
+
+	node = fdt_find_node("/chosen");
+	if (node != NULL) {
+		char *prop;
+		int len;
+		static uint8_t lladdr[6];
+
+		len = fdt_node_property(node, "bootargs", &prop);
+		if (len > 0)
+			collect_kernel_args(prop);
+
+		len = fdt_node_property(node, "openbsd,bootduid", &prop);
+		if (len == sizeof(bootduid))
+			memcpy(bootduid, prop, sizeof(bootduid));
+
+		len = fdt_node_property(node, "openbsd,bootmac", &prop);
+		if (len == sizeof(lladdr)) {
+			memcpy(lladdr, prop, sizeof(lladdr));
+			bootmac = lladdr;
+		}
+
+		len = fdt_node_property(node, "openbsd,sr-bootuuid", &prop);
+#if NSOFTRAID > 0
+		if (len == sizeof(sr_bootuuid))
+			memcpy(&sr_bootuuid, prop, sizeof(sr_bootuuid));
+#endif
+		if (len > 0)
+			explicit_bzero(prop, len);
+
+		len = fdt_node_property(node, "openbsd,sr-bootkey", &prop);
+#if NSOFTRAID > 0
+		if (len == sizeof(sr_bootkey))
+			memcpy(&sr_bootkey, prop, sizeof(sr_bootkey));
+#endif
+		if (len > 0)
+			explicit_bzero(prop, len);
+
+		len = fdt_node_property(node, "openbsd,uefi-mmap-start", &prop);
+		if (len == sizeof(mmap_start))
+			mmap_start = bemtoh64((uint64_t *)prop);
+		len = fdt_node_property(node, "openbsd,uefi-mmap-size", &prop);
+		if (len == sizeof(mmap_size))
+			mmap_size = bemtoh32((uint32_t *)prop);
+		len = fdt_node_property(node, "openbsd,uefi-mmap-desc-size", &prop);
+		if (len == sizeof(mmap_desc_size))
+			mmap_desc_size = bemtoh32((uint32_t *)prop);
+		len = fdt_node_property(node, "openbsd,uefi-mmap-desc-ver", &prop);
+		if (len == sizeof(mmap_desc_ver))
+			mmap_desc_ver = bemtoh32((uint32_t *)prop);
+
+		len = fdt_node_property(node, "openbsd,uefi-system-table", &prop);
+		if (len == sizeof(system_table))
+			system_table = bemtoh64((uint64_t *)prop);
+	}
+
+	/* Set the pcpu data, this is needed by pmap_bootstrap */
+	// smp
+	pcpup = &cpu_info_primary;
+
+	/*
+	 * Set the pcpu pointer with a backup in tpidr_el1 to be
+	 * loaded when entering the kernel from userland.
+	 */
+	__asm __volatile(
+	    "mov x18, %0 \n"
+	    "msr tpidr_el1, %0" :: "r"(pcpup));
+
+	cache_setup();
+
+	process_kernel_args();
+
+	void _start(void);
+	long kernbase = (long)&_start & ~0x00fff;
+
+	/* The bootloader has loaded us into a 64MB block. */
+	memstart = KERNBASE + kvo;
+	memend = memstart + 64 * 1024 * 1024;
+
+	/* Bootstrap enough of pmap to enter the kernel proper. */
+	vstart = pmap_bootstrap(kvo, rbp->kern_l1pt,
+	    kernbase, esym, memstart, memend);
+
+	// XX correctly sized?
+	proc0paddr = (struct user *)rbp->kern_stack;
+
+	msgbufaddr = (caddr_t)vstart;
+	msgbufphys = pmap_steal_avail(round_page(MSGBUFSIZE), PAGE_SIZE, NULL);
+	vstart += round_page(MSGBUFSIZE);
+
+	zero_page = vstart;
+	vstart += MAXCPUS * PAGE_SIZE;
+	copy_src_page = vstart;
+	vstart += MAXCPUS * PAGE_SIZE;
+	copy_dst_page = vstart;
+	vstart += MAXCPUS * PAGE_SIZE;
+
+	/* Relocate the FDT to safe memory. */
+	if (fdt_get_size(config) != 0) {
+		uint32_t csize, size = round_page(fdt_get_size(config));
+		paddr_t pa;
+		vaddr_t va;
+
+		pa = pmap_steal_avail(size, PAGE_SIZE, NULL);
+		memcpy((void *)pa, config, size); /* copy to physical */
+		for (va = vstart, csize = size; csize > 0;
+		    csize -= PAGE_SIZE, va += PAGE_SIZE, pa += PAGE_SIZE)
+			pmap_kenter_cache(va, pa, PROT_READ, PMAP_CACHE_WB);
+
+		fdt = (void *)vstart;
+		vstart += size;
+	}
+
+	/* Relocate the EFI memory map too. */
+	if (mmap_start != 0) {
+		uint32_t csize, size = round_page(mmap_size);
+		paddr_t pa, startpa, endpa;
+		vaddr_t va;
+
+		startpa = trunc_page(mmap_start);
+		endpa = round_page(mmap_start + mmap_size);
+		for (pa = startpa, va = vstart; pa < endpa;
+		    pa += PAGE_SIZE, va += PAGE_SIZE)
+			pmap_kenter_cache(va, pa, PROT_READ, PMAP_CACHE_WB);
+		pa = pmap_steal_avail(size, PAGE_SIZE, NULL);
+		memcpy((void *)pa, (caddr_t)vstart + (mmap_start - startpa),
+		    mmap_size); /* copy to physical */
+		pmap_kremove(vstart, endpa - startpa);
+
+		for (va = vstart, csize = size; csize > 0;
+		    csize -= PAGE_SIZE, va += PAGE_SIZE, pa += PAGE_SIZE)
+			pmap_kenter_cache(va, pa, PROT_READ | PROT_WRITE, PMAP_CACHE_WB);
+
+		mmap = (void *)vstart;
+		vstart += size;
+	}
+
+	/*
+	 * Managed KVM space is what we have claimed up to end of
+	 * mapped kernel buffers.
+	 */
+	{
+	// export back to pmap
+	extern vaddr_t virtual_avail, virtual_end;
+	virtual_avail = vstart;
+	vend = VM_MAX_KERNEL_ADDRESS; // XXX
+	virtual_end = vend;
+	}
+
+	/* Now we can reinit the FDT, using the virtual address. */
+	if (fdt)
+		fdt_init(fdt);
+
+	// XXX
+	int pmap_bootstrap_bs_map(bus_space_tag_t t, bus_addr_t bpa,
+	    bus_size_t size, int flags, bus_space_handle_t *bshp);
+
+	map_func_save = arm64_bs_tag._space_map;
+	arm64_bs_tag._space_map = pmap_bootstrap_bs_map;
+
+	// cninit
+	consinit();
+
+	arm64_bs_tag._space_map = map_func_save;
+
+	/* Remap EFI runtime. */
+	if (mmap_start != 0 && system_table != 0)
+		remap_efi_runtime(system_table);
+
+	/* XXX */
+	pmap_avail_fixup();
+
+	uvmexp.pagesize = PAGE_SIZE;
+	uvm_setpagesize();
+
+	/* Make what's left of the initial 64MB block available to UVM. */
+	pmap_physload_avail();
+
+	/* Make all other physical memory available to UVM. */
+	if (mmap && mmap_desc_ver == EFI_MEMORY_DESCRIPTOR_VERSION) {
+		EFI_MEMORY_DESCRIPTOR *desc = mmap;
+		int i;
+
+		/*
+		 * Load all memory marked as EfiConventionalMemory.
+		 * Don't bother with blocks smaller than 64KB.  The
+		 * initial 64MB memory block should be marked as
+		 * EfiLoaderData so it won't be added again here.
+		 */
+		for (i = 0; i < mmap_size / mmap_desc_size; i++) {
+			printf("type 0x%x pa 0x%llx va 0x%llx pages 0x%llx attr 0x%llx\n",
+			    desc->Type, desc->PhysicalStart,
+			    desc->VirtualStart, desc->NumberOfPages,
+			    desc->Attribute);
+			if (desc->Type == EfiConventionalMemory &&
+			    desc->NumberOfPages >= 16) {
+				uvm_page_physload(atop(desc->PhysicalStart),
+				    atop(desc->PhysicalStart) +
+				    desc->NumberOfPages,
+				    atop(desc->PhysicalStart),
+				    atop(desc->PhysicalStart) +
+				    desc->NumberOfPages, 0);
+				physmem += desc->NumberOfPages;
+			}
+			desc = NextMemoryDescriptor(desc, mmap_desc_size);
+		}
+	} else {
+		paddr_t start, end;
+		int i;
+
+		node = fdt_find_node("/memory");
+		if (node == NULL)
+			panic("%s: no memory specified", __func__);
+
+		for (i = 0; i < VM_PHYSSEG_MAX; i++) {
+			if (fdt_get_reg(node, i, &reg))
+				break;
+			if (reg.size == 0)
+				continue;
+
+			start = reg.addr;
+			end = MIN(reg.addr + reg.size, (paddr_t)-PAGE_SIZE);
+
+			/*
+			 * The intial 64MB block is not excluded, so we need
+			 * to make sure we don't add it here.
+			 */
+			if (start < memend && end > memstart) {
+				if (start < memstart) {
+					uvm_page_physload(atop(start),
+					    atop(memstart), atop(start),
+					    atop(memstart), 0);
+					physmem += atop(memstart - start);
+				}
+				if (end > memend) {
+					uvm_page_physload(atop(memend),
+					    atop(end), atop(memend),
+					    atop(end), 0);
+					physmem += atop(end - memend);
+				}
+			} else {
+				uvm_page_physload(atop(start), atop(end),
+				    atop(start), atop(end), 0);
+				physmem += atop(end - start);
+			}
+		}
+	}
+
+	/*
+	 * Make sure that we have enough KVA to initialize UVM.  In
+	 * particular, we need enough KVA to be able to allocate the
+	 * vm_page structures.
+	 */
+	pmap_growkernel(VM_MIN_KERNEL_ADDRESS + 1024 * 1024 * 1024 +
+	    physmem * sizeof(struct vm_page));
+
+#ifdef DDB
+	db_machine_init();
+
+	/* Firmware doesn't load symbols. */
+	ddb_init();
+
+	if (boothowto & RB_KDB)
+		db_enter();
+#endif
+
+	softintr_init();
+	splraise(IPL_IPI);
+#endif
+}
+
