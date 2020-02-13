@@ -118,6 +118,11 @@ consinit(void)
 #endif
 }
 
+//XXX TODO: need to populate console for qemu
+struct consdev constab[] = {
+	{ NULL }
+};
+
 void
 cpu_idle_enter()
 {
