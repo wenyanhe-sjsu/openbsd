@@ -42,7 +42,8 @@ CWARNFLAGS=	-Werror -Wall -Wimplicit-function-declaration \
 		-Wframe-larger-than=2047
 
 CMACHFLAGS=	--target=riscv64-unknown-openbsd6.6 -march=rv64gc \
-		-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
+		-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -mno-relax \
+		-mcmodel=medany
 CMACHFLAGS+=	-ffreestanding ${NOPIE_FLAGS}
 SORTR=		sort -R
 .if ${IDENT:M-DNO_PROPOLICE}
@@ -57,7 +58,7 @@ DEBUG?=		-g
 COPTS?=		-O2
 CFLAGS=		${DEBUG} ${CWARNFLAGS} ${CMACHFLAGS} ${COPTS} ${PIPE}
 AFLAGS=		-D_LOCORE -x assembler-with-cpp ${CWARNFLAGS} ${CMACHFLAGS}
-LINKFLAGS=	-T ld.script -X --warn-common -nopie
+LINKFLAGS=	-T ld.script -X --warn-common -no-pie
 
 HOSTCC?=	${CC}
 HOSTED_CPPFLAGS=${CPPFLAGS:S/^-nostdinc$//}
