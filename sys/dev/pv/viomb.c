@@ -54,6 +54,8 @@
 #define VIOMBDEBUG(...)
 #endif
 
+#define CMPE_VIOMB_DEBUG 1
+
 /* flags used to specify kind of operation,
  * actually should be moved to virtiovar.h
  */
@@ -80,6 +82,7 @@
 #define VIRTIO_BALLOON_S_MEMTOT   5   /* Total amount of memory */
 #define VIRTIO_BALLOON_S_AVAIL    6   /* */
 #define VIRTIO_BALLOON_S_NR       7   /* */
+#define VIOMB_STATS_MAX			  8   /* Maximum number of tags */
 
 /* CMPE */
 #define VIOMB_BUFSIZE   16
@@ -136,19 +139,21 @@ struct stats_req {
  * Just for driver
  */
 struct viomb_softc {
-	struct device		sc_dev;
-	struct virtio_softc	*sc_virtio;
-	/* CMPE */
-	struct virtqueue	sc_vq[3];
-	u_int32_t		sc_npages; 			/* original Host's # desired pages */
-	u_int32_t		sc_actual; 			/* # of pages actually given by driver */
-	struct balloon_req	sc_req;
-	struct taskq		*sc_taskq;
-	struct task		sc_task;
-	struct pglist		sc_balloon_pages;
-	struct ksensor		sc_sens[2];
-	struct ksensordev	sc_sensdev;
-	struct stats_req sc_stats;         /* added the   */
+	struct device				sc_dev;
+	struct virtio_softc			*sc_virtio;
+	struct virtqueue			sc_vq[3];
+	u_int32_t					sc_npages; 			/* original Host's # desired pages */
+	u_int32_t					sc_actual; 			/* # of pages actually given by driver */
+	struct balloon_req			sc_req;
+	struct taskq				*sc_taskq;
+	struct task					sc_task;
+	struct pglist				sc_balloon_pages;
+	struct ksensor				sc_sens[2];
+	struct ksensordev			sc_sensdev;
+	//struct stats_req sc_stats;         /* added the   */
+	bus_dmamap_t        		sc_stats_dmamap;
+	struct virtio_balloon_stat 	*sc_stats_buf
+	int 						sc_stats_needs_update;
 };
 
 int	viomb_match(struct device *, void *, void *);
@@ -221,7 +226,8 @@ viomb_attach(struct device *parent, struct device *self, void *aux)
 	vsc->sc_ipl = IPL_BIO;
 	vsc->sc_config_change = viomb_config_change;
 
-	vsc->sc_driver_features = VIRTIO_BALLOON_F_MUST_TELL_HOST;
+	vsc->sc_driver_features = VIRTIO_BALLOON_F_MUST_TELL_HOST |
+							  VIRTIO_BALLOON_F_STATS_VQ;
 	if (virtio_negotiate_features(vsc, viomb_feature_names) != 0)
 		goto err;
 
@@ -236,7 +242,7 @@ viomb_attach(struct device *parent, struct device *self, void *aux)
 
     /* CMPE */
     if ((virtio_alloc_vq(vsc, &sc->sc_vq[VQ_STATS], VQ_STATS,
-	     sizeof(u_int32_t) * PGS_PER_REQ, 1, "stats") != 0))
+	     VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat), 1, "stats") != 0))
 		goto err;
 	vsc->sc_nvqs++;
 
@@ -269,6 +275,26 @@ viomb_attach(struct device *parent, struct device *self, void *aux)
 		goto err_dmamap;
 	}
 
+	if ((sc->sc_stats_buf = dma_alloc(VIOMB_STATS_MAX *
+	    sizeof(struct virtio_balloon_stat), PR_NOWAIT|PR_ZERO)) == NULL) {
+		printf("%s: Can't alloc DMA memory.\n", DEVNAME(sc));
+		goto err_dmamap;
+	}
+	if (bus_dmamap_create(vsc->sc_dmat,
+	    VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat),
+	    1, VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat), 0,
+	    BUS_DMA_NOWAIT, &sc->sc_stats_dmamap)) {
+		printf("%s: dmamap creation failed.\n", DEVNAME(sc));
+		goto err_dmamap;
+	}
+	if (bus_dmamap_load(vsc->sc_dmat, sc->sc_stats_dmamap,
+	    sc->sc_stats_buf,
+	    VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat),
+	    NULL, BUS_DMA_NOWAIT)) {
+		printf("%s: dmamap load failed.\n", DEVNAME(sc));
+		goto err_dmamap2;
+	}
+
 	sc->sc_taskq = taskq_create("viomb", 1, IPL_BIO, 0);
 	if (sc->sc_taskq == NULL)
 		goto err_dmamap;
@@ -293,11 +319,17 @@ viomb_attach(struct device *parent, struct device *self, void *aux)
 	printf("\n");
 //	viombh_vq_dequeue();
 	return;
+
+err_dmamap2:
+	bus_dmamap_destroy(vsc->sc_dmat, sc->sc_stats_dmamap);
 err_dmamap:
 	bus_dmamap_destroy(vsc->sc_dmat, sc->sc_req.bl_dmamap);
 err:
 	if (sc->sc_req.bl_pages)
 		dma_free(sc->sc_req.bl_pages, sizeof(u_int32_t) * PGS_PER_REQ);
+	if (sc->sc_stats_buf)
+		dma_free(sc->sc_stats_buf,
+			VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat));
 	for (i = 0; i < vsc->sc_nvqs; i++)
 		virtio_free_vq(vsc, &sc->sc_vq[i]);
 	vsc->sc_nvqs = 0;
@@ -313,6 +345,7 @@ viomb_config_change(struct virtio_softc *vsc)
 {
 	struct viomb_softc *sc = (struct viomb_softc *)vsc->sc_child;
 
+	printf("config change\n");
 	task_add(sc->sc_taskq, &sc->sc_task);
 
 	return (1);
@@ -328,7 +361,7 @@ void
 viomb_worker(void *arg1)
 {
 	struct viomb_softc *sc = (struct viomb_softc *)arg1;
-	int s;
+	int s, i;
 
 	s = splbio();
 	viomb_read_config(sc);
@@ -350,6 +383,12 @@ viomb_worker(void *arg1)
 
 	sc->sc_sens[0].value = sc->sc_npages << PAGE_SHIFT;
 	sc->sc_sens[1].value = sc->sc_actual << PAGE_SHIFT;
+
+	if (sc->sc_stats_needs_update) {
+		for (i = 0; i < VIOMB_STATS_MAX; i++)
+			printf("%s: stats[%d]: tag=0x%x\n", __func__, i,
+			    sc->sc_stats_buf[i].tag);
+	}
 
 	splx(s);
 }
