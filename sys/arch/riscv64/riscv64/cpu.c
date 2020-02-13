@@ -354,7 +354,9 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 int
 cpu_clockspeed(int *freq)
 {
-	*freq = clock_get_frequency(cpu_node, NULL) / 1000000;
+	//*freq = clock_get_frequency(cpu_node, NULL) / 1000000;
+	//XXX don't care for now
+	*freq = 100;
 	return 0;
 }
 

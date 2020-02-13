@@ -231,6 +231,68 @@ cpu_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
 	/* NOTREACHED */
 }
 
+int	waittime = -1;
+
+__dead void
+boot(int howto)
+{
+	if ((howto & RB_RESET) != 0)
+		goto doreset;
+
+	if (cold) {
+		if ((howto & RB_USERREQ) == 0)
+			howto |= RB_HALT;
+		goto haltsys;
+	}
+
+	boothowto = howto;
+	if ((howto & RB_NOSYNC) == 0 && waittime < 0) {
+		waittime = 0;
+		vfs_shutdown(curproc);
+
+		if ((howto & RB_TIMEBAD) == 0) {
+			resettodr();
+		} else {
+			printf("WARNING: not updating battery clock\n");
+		}
+	}
+	if_downall();
+
+	uvm_shutdown();
+	splhigh();
+	cold = 1;
+
+	if ((howto & RB_DUMP) != 0)
+		//dumpsys();//XXX no dump so far. CMPE295
+
+haltsys:
+	config_suspend_all(DVACT_POWERDOWN);
+
+	if ((howto & RB_HALT) != 0) {
+		if ((howto & RB_POWERDOWN) != 0) {
+			printf("\nAttempting to power down...\n");
+			delay(500000);
+			if (powerdownfn)
+				(*powerdownfn)();
+		}
+
+		printf("\n");
+		printf("The operating system has halted.\n");
+		printf("Please press any key to reboot.\n\n");
+		cngetc();
+	}
+
+doreset:
+	printf("rebooting...\n");
+	delay(500000);
+	if (cpuresetfn)
+		(*cpuresetfn)();
+	printf("reboot failed; spinning\n");
+	for (;;)
+		continue;
+	/* NOTREACHED */
+}
+
 //Copied from ARM64, removed some registers. XXX
 void
 setregs(struct proc *p, struct exec_package *pack, u_long stack,
