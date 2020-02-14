@@ -152,7 +152,7 @@ struct viomb_softc {
 	struct ksensordev			sc_sensdev;
 	//struct stats_req sc_stats;         /* added the   */
 	bus_dmamap_t        		sc_stats_dmamap;
-	struct virtio_balloon_stat 	*sc_stats_buf
+	struct virtio_balloon_stat 	*sc_stats_buf;
 	int 						sc_stats_needs_update;
 };
 
