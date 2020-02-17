@@ -542,11 +542,8 @@ viomb_stats(struct viomb_softc *sc)
 	//struct balloon_req *b;  
 	//struct stats_req *s;                                         // defined in viomb.c
 	//struct vm_page *p;
-	struct virtio_balloon_stat *stat;
 	struct virtqueue *vq = &sc->sc_vq[VQ_STATS];
 	int slot;
-
-	stat = &sc->sc_stats_buf;
 
 	// if that slot is occupied,
 	//
@@ -567,8 +564,8 @@ viomb_stats(struct viomb_softc *sc)
 
 	//from our "inflate" function
 
-	stat->tag = 1;
-	stat->val = 45;
+	sc->sc_stats_buf->tag = 1;
+	sc->sc_stats_buf->val = 45;
 	bus_dmamap_sync(vsc->sc_dmat, sc->sc_stats_dmamap, 0,
 			VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat),
 			BUS_DMASYNC_PREWRITE);
