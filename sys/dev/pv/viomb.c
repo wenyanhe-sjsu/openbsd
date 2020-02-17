@@ -568,13 +568,13 @@ viomb_stats(struct viomb_softc *sc)
 	//from our "inflate" function
 
 	stat->tag = 1;
-	stat->value = 45;
-	bus_dmamap_sync(vsc->sc_dmat, sc_stats_dmamap, 0,
+	stat->val = 45;
+	bus_dmamap_sync(vsc->sc_dmat, sc->sc_stats_dmamap, 0,
 			VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat),
 			BUS_DMASYNC_PREWRITE);
 
-	virtio_enqueue_p(vq, slot,  sc_stats_dmamap, 0,
-			 sizeof(sc_stats_dmamap) , VRING_READ);
+	virtio_enqueue_p(vq, slot,  sc->sc_stats_dmamap, 0,
+			 VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat), VRING_READ);
 	virtio_enqueue_commit(vsc, vq, slot, VRING_NOTIFY);
 	return;
 err:
