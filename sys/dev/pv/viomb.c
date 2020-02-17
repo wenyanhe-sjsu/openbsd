@@ -41,6 +41,7 @@
 #include <dev/pv/virtioreg.h>
 #include <dev/pv/virtiovar.h>
 
+
 #if VIRTIO_PAGE_SIZE!=PAGE_SIZE
 #error non-4K page sizes are not supported yet
 #endif
@@ -82,7 +83,7 @@
 #define VIRTIO_BALLOON_S_MEMTOT   5   /* Total amount of memory */
 #define VIRTIO_BALLOON_S_AVAIL    6   /* */
 #define VIRTIO_BALLOON_S_NR       7   /* */
-#define VIOMB_STATS_MAX			  8   /* Maximum number of tags */
+#define VIOMB_STATS_MAX			  1   /* Maximum number of tags */
 
 /* CMPE */
 #define VIOMB_BUFSIZE   16
@@ -541,11 +542,11 @@ viomb_stats(struct viomb_softc *sc)
 	//struct balloon_req *b;  
 	//struct stats_req *s;                                         // defined in viomb.c
 	//struct vm_page *p;
+	struct virtio_balloon_stat *stat;
 	struct virtqueue *vq = &sc->sc_vq[VQ_STATS];
 	int slot;
 
-
-	bus_dmamap_t	 bl_dmamap;
+	stat = &sc->sc_stats_buf;
 
 	// if that slot is occupied,
 	//
@@ -565,11 +566,15 @@ viomb_stats(struct viomb_softc *sc)
 	//     BUS_DMASYNC_PREREAD);
 
 	//from our "inflate" function
-	//bus_dmamap_sync(vsc->sc_dmat, b->bl_dmamap, 0,
-	//		sizeof(u_int32_t) * nvpages, BUS_DMASYNC_PREWRITE);
 
-	virtio_enqueue_p(vq, slot,  bl_dmamap, 0,
-			 sizeof(bl_dmamap) , VRING_READ);
+	stat->tag = 1;
+	stat->value = 45;
+	bus_dmamap_sync(vsc->sc_dmat, sc_stats_dmamap, 0,
+			VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat),
+			BUS_DMASYNC_PREWRITE);
+
+	virtio_enqueue_p(vq, slot,  sc_stats_dmamap, 0,
+			 sizeof(sc_stats_dmamap) , VRING_READ);
 	virtio_enqueue_commit(vsc, vq, slot, VRING_NOTIFY);
 	return;
 err:
