@@ -138,7 +138,7 @@ gapdummy.o:
 makegap.sh:
 	cp $S/conf/makegap.sh $@
 
-MAKE_GAP = LD="${LD}" sh makegap.sh 0xd4d4d4d4 gapdummy.o
+MAKE_GAP = LD="${LD}" sh makegap.sh 0x00000000 gapdummy.o
 
 gap.o:	Makefile makegap.sh gapdummy.o vers.o
 	${MAKE_GAP}
