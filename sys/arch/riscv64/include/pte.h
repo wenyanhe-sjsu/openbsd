@@ -40,23 +40,27 @@
 #define	PTE_PROMOTE	(PTE_V | PTE_RWX | PTE_D | PTE_A | PTE_G | PTE_U | \
 			 PTE_SW_MANAGED | PTE_SW_WIRED
 
-/* Level 0 table, 1GiB per entry */
-#define	 L0_SHIFT	30
-#define	 L0_SIZE	(1ULL << L0_SHIFT)
-#define	 L0_OFFSET	(L0_SIZE - 1)
+/* Level 0 table, 512GiB per entry */
+#define	 L0_SHIFT	39
 
-/* Level 1 table, 2MiB per entry */
-#define	 L1_SHIFT	21
+/* Level 1 table, 1GiB per entry */
+#define	 L1_SHIFT	30
 #define	 L1_SIZE	(1UL << L1_SHIFT)
 #define	 L1_OFFSET	(L1_SIZE - 1)
 
-/* Level 2 table, 4KiB per entry */
-#define	 L2_SHIFT	12
+/* Level 2 table, 2MiB per entry */
+#define	 L2_SHIFT	21
 #define	 L2_SIZE	(1UL << L2_SHIFT)
 #define	 L2_OFFSET	(L2_SIZE - 1)
 
+/* Level 3 table, 4KiB per entry */
+#define	 L3_SHIFT	12
+#define	 L3_SIZE	(1UL << L3_SHIFT)
+#define	 L3_OFFSET	(L3_SIZE - 1)
+
 /* page mapping */
-#define	 Ln_ENTRIES	(1 << 9)
+#define	 Ln_ENTRIES_SHIFT 9
+#define	 Ln_ENTRIES	(1 << Ln_ENTRIES_SHIFT)
 #define	 Ln_ADDR_MASK	(Ln_ENTRIES - 1)
 #define	 Ln_TABLE_MASK	((1 << 12) - 1)
 
