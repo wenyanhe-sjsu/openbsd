@@ -12,7 +12,7 @@ include		"../../../conf/GENERIC"
 maxusers	32
 
 makeoptions	KERNEL_BASE_PHYS="0x00200000"
-makeoptions	KERNEL_BASE_VIRT="0xffffff8000200000"
+makeoptions	KERNEL_BASE_VIRT="0xffffffc000200000"
 
 config	bsd	swap generic
 

@@ -28,13 +28,13 @@
 // XXX Only targeting compatibility with SV39
 #define VP_IDX0_CNT	512
 #define VP_IDX0_MASK	(VP_IDX0_CNT-1)
-#define VP_IDX0_POS	30
+#define VP_IDX0_POS	12
 #define VP_IDX1_CNT	512
 #define VP_IDX1_MASK	(VP_IDX1_CNT-1)
 #define VP_IDX1_POS	21
 #define VP_IDX2_CNT	512
 #define VP_IDX2_MASK	(VP_IDX2_CNT-1)
-#define VP_IDX2_POS	12
+#define VP_IDX2_POS	30
 
 /* cache flags */
 // XXX These are duplicated from arm64 and may need some reworking

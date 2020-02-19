@@ -112,7 +112,7 @@ _start_kern_bootstrap:
 	/* step2)  Level 2 superpages (512 x 2MiB) */ 	//mega pages: two-level page table
 	lla	s1, pagetable_l2
 	//calc PTE
-	srli	t4, s9, 21		/* Div physmem base by 2 MiB */
+	srli	t4, s9, L2_SHIFT	/* Div physmem base by 2 MiB */
 	li	t2, 512			/* Build totally 512 entries */
 	add	t3, t4, t2
 	li	t5, 0
