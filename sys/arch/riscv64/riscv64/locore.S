@@ -86,6 +86,27 @@ _start_kern_bootstrap:
 	/*
 	 * Page tables
 	 */
+
+	/* step0) Identity map kernel @ 0x80000000 */
+	/* Build PTE for 1 GiB identity-mapped gigapage */
+	lla	s1, pagetable_l1	//phy addr
+	mv	s2, s9			//phy addr
+	srli	s2, s2, PAGE_SHIFT	//12, 4K page
+	slli	t5, s2, PTE_PPN0_S	/* (s2 << PTE_PPN0_S) *///10bit Phys Mem Attribute 
+	li	t4, (PTE_KERN | PTE_X)	//flag bit
+	or	t6, t4, t5		//t6 now is PTE for a 1 GiB gigapage
+
+	/* Calculate VPN[2] for 1 GiB identity-mapped gigapage */
+	mv	a5, s9			//va -- identity mapped
+	srli	a5, a5, L1_SHIFT	//30,  remaining va[63:30]
+	andi	a5, a5, 0x1ff		//only use va[38:30] as VPN[2], =0x002
+
+	/* Store L1 PTE entry */
+	li	a6, PTE_SIZE
+	mulw	a5, a5, a6
+	add	t0, s1, a5
+	mv	s8, t0		// Store address in L1 Page Table to unmap later
+	sd	t6, (t0)
 	
 	/* step1) Add L1 entry for kernel */
 	
@@ -167,6 +188,9 @@ _start_kern_bootstrap:
 	add	t1, s1, a5
 	sd	t0, (t1)
 
+	/* Create identity mapping for initial 1 GiB memory */
+	mv	t1, s9
+
 	/* Page tables END */
 
 
@@ -176,6 +200,7 @@ _start_kern_bootstrap:
 	li	t1, KERNBASE		//virt addr		
 	add	t0, t0, t1		//
 	csrw	stvec, t0		//virt addr
+	mv	s3, t0
 
 	/* Set page tables base register */
 	lla	s2, pagetable_l1	//pa
@@ -184,6 +209,7 @@ _start_kern_bootstrap:
 	or	s2, s2, t0
 	sfence.vma			//Supervisor Fence for Virtual Memory, to flush TLB
 	csrw	satp, s2
+	jr	s3
 
 	.align 2
 va:					//XXX just a trampoline?
@@ -192,6 +218,10 @@ va:					//XXX just a trampoline?
 .option norelax
 	lla	gp, __global_pointer$
 .option pop
+
+	/* Unmap the identity mapped kernel gigapage */
+	sd	x0, (s8)	// s8 is addr of pte for identity mapped kernel
+	sfence.vma		// Flush the TLB. Goodbye identity mapped kernel!
 
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler	//-->where the real setup happens
@@ -223,18 +253,18 @@ va:					//XXX just a trampoline?
 #endif
 
 	/* Fill riscv_bootparams */
-	addi	sp, sp, -40				// 5 slots of 8B-size data
+	addi	sp, sp, -RISCV_BOOTPARAMS_SIZEOF
 
 	la	t0, pagetable_l1
-	sd	t0, 0(sp) /* kern_l1pt */		//1
-	sd	s9, 8(sp) /* kern_phys */		//2		
+	sd	t0, KERN_L1PT(sp)
+	sd	s9, KERN_PHYS(sp)
 
 	la	t0, initstack
-	sd	t0, 16(sp) /* kern_stack */		//3
+	sd	t0, KERN_STACK(sp)
 
-	li	t0, (VM_MAX_KERNEL_ADDRESS - 2 * L2_SIZE)
-	sd	t0, 24(sp) /* dtbp_virt */		//4
-	sd	a1, 32(sp) /* dtbp_phys */		//5
+	li	t0, (VM_MAX_KERNEL_ADDRESS - 2 * L2_SIZE) // XXX Why?
+	sd	t0, DTBP_VIRT(sp)
+	sd	a1, DTBP_PHYS(sp)
 
 	mv	a0, sp				//stack setup, can call C now!
 	call	_C_LABEL(initriscv)	/* Off we go */	//XXX defined in machdep.c

@@ -302,8 +302,10 @@ setregs(struct proc *p, struct exec_package *pack, u_long stack,
 	struct trapframe *tf;
 
 	/* If we were using the FPU, forget about it. */
+#if 0	// XXX ignore fp for now
 	if (p->p_addr->u_pcb.pcb_fpcpu != NULL)
-		//vfp_discard(p);//XXX ignore fp so far
+		vfp_discard(p);
+#endif
 	p->p_addr->u_pcb.pcb_flags &= ~PCB_FPU;
 
 	tf = p->p_addr->u_pcb.pcb_tf;
@@ -419,32 +421,31 @@ sys_sysarch(struct proc *p, void *v, register_t *retval)
 	return (error);
 }
 
+uint64_t mmap_start;
+uint32_t mmap_size;
+uint32_t mmap_desc_size;
+uint32_t mmap_desc_ver;
+
+void	collect_kernel_args(char *);
+void	process_kernel_args(void);
 
 void
 initriscv(struct riscv_bootparams *rbp)
 {
-	panic("initriscv: u think u can initialize me?");
-#if 0 //till end
-
-	vaddr_t vstart, vend;
-	struct cpu_info *pcpup;
-	long kvo = rbp->kern_delta;
-	//caddr_t kmdp;
-	paddr_t memstart, memend;
-	void *config = rbp->arg2;
-	void *fdt = NULL;
-	EFI_PHYSICAL_ADDRESS system_table = 0;
+#if 0	// XXX not yet used
+	// vaddr_t vstart, vend;
+	// struct cpu_info *pcpup;
+	// long kvo = 0x0; // XXX VA --> PA delta
+	// paddr_t memstart, memend;
+#endif  // 0
+#if 0
+	// XXX What?
 	int (*map_func_save)(bus_space_tag_t, bus_addr_t, bus_size_t, int,
 	    bus_space_handle_t *);
-
-	// NOTE that 1GB of ram is mapped in by default in
-	// the bootstrap memory config, so nothing is necessary
-	// until pmap_bootstrap_finalize is called??
-	pmap_map_early((paddr_t)config, PAGE_SIZE);
-	if (!fdt_init(config) || fdt_get_size(config) == 0)
-	pmap_map_early((paddr_t)config, round_page(fdt_get_size(config)));
-
-	struct fdt_reg reg;
+#endif  // 0
+	// NOTE: FDT is already mapped (rpb->dtbp_virt & rpb->dtbp_phys)
+	
+	// struct fdt_reg reg; // XXX not yet used
 	void *node;
 
 	node = fdt_find_node("/chosen");
@@ -496,11 +497,15 @@ initriscv(struct riscv_bootparams *rbp)
 		if (len == sizeof(mmap_desc_ver))
 			mmap_desc_ver = bemtoh32((uint32_t *)prop);
 
+#if 0
+		// XXX What?
 		len = fdt_node_property(node, "openbsd,uefi-system-table", &prop);
 		if (len == sizeof(system_table))
 			system_table = bemtoh64((uint64_t *)prop);
+#endif
 	}
 
+#if 0
 	/* Set the pcpu data, this is needed by pmap_bootstrap */
 	// smp
 	pcpup = &cpu_info_primary;
@@ -716,3 +721,69 @@ initriscv(struct riscv_bootparams *rbp)
 #endif
 }
 
+char bootargs[256];
+
+void
+collect_kernel_args(char *args)
+{
+	/* Make a local copy of the bootargs */
+	strlcpy(bootargs, args, sizeof(bootargs));
+}
+
+void
+process_kernel_args(void)
+{
+	char *cp = bootargs;
+
+	if (cp[0] == '\0') {
+		boothowto = RB_AUTOBOOT;
+		return;
+	}
+
+	boothowto = 0;
+	boot_file = bootargs;
+
+	/* Skip the kernel image filename */
+	while (*cp != ' ' && *cp != 0)
+		++cp;
+
+	if (*cp != 0)
+		*cp++ = 0;
+
+	while (*cp == ' ')
+		++cp;
+
+	boot_args = cp;
+
+	printf("bootfile: %s\n", boot_file);
+	printf("bootargs: %s\n", boot_args);
+
+	/* Setup pointer to boot flags */
+	while (*cp != '-')
+		if (*cp++ == '\0')
+			return;
+
+	for (;*++cp;) {
+		int fl;
+
+		fl = 0;
+		switch(*cp) {
+		case 'a':
+			fl |= RB_ASKNAME;
+			break;
+		case 'c':
+			fl |= RB_CONFIG;
+			break;
+		case 'd':
+			fl |= RB_KDB;
+			break;
+		case 's':
+			fl |= RB_SINGLE;
+			break;
+		default:
+			printf("unknown option `%c'\n", *cp);
+			break;
+		}
+		boothowto |= fl;
+	}
+}
