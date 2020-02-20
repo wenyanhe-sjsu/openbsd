@@ -105,6 +105,7 @@ _start_kern_bootstrap:
 	li	a6, PTE_SIZE
 	mulw	a5, a5, a6
 	add	t0, s1, a5
+	mv	s8, t0		// Store address in L1 Page Table to unmap later
 	sd	t6, (t0)
 	
 	/* step1) Add L1 entry for kernel */
@@ -217,6 +218,10 @@ va:					//XXX just a trampoline?
 .option norelax
 	lla	gp, __global_pointer$
 .option pop
+
+	/* Unmap the identity mapped kernel gigapage */
+	sd	x0, (s8)	// s8 is addr of pte for identity mapped kernel
+	sfence.vma		// Flush the TLB. Goodbye identity mapped kernel!
 
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler	//-->where the real setup happens
