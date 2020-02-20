@@ -39,4 +39,5 @@
 	.globl _start
 _start:
 	/* jump to locore.S _start_kern_bootstrap*/
-	j _start_kern_bootstrap 
+	lla	t0, _start_kern_bootstrap
+	jr	t0
