@@ -253,18 +253,18 @@ va:					//XXX just a trampoline?
 #endif
 
 	/* Fill riscv_bootparams */
-	addi	sp, sp, -40				// 5 slots of 8B-size data
+	addi	sp, sp, -RISCV_BOOTPARAMS_SIZEOF
 
 	la	t0, pagetable_l1
-	sd	t0, 0(sp) /* kern_l1pt */		//1
-	sd	s9, 8(sp) /* kern_phys */		//2		
+	sd	t0, KERN_L1PT(sp)
+	sd	s9, KERN_PHYS(sp)
 
 	la	t0, initstack
-	sd	t0, 16(sp) /* kern_stack */		//3
+	sd	t0, KERN_STACK(sp)
 
-	li	t0, (VM_MAX_KERNEL_ADDRESS - 2 * L2_SIZE)
-	sd	t0, 24(sp) /* dtbp_virt */		//4
-	sd	a1, 32(sp) /* dtbp_phys */		//5
+	li	t0, (VM_MAX_KERNEL_ADDRESS - 2 * L2_SIZE) // XXX Why?
+	sd	t0, DTBP_VIRT(sp)
+	sd	a1, DTBP_PHYS(sp)
 
 	mv	a0, sp				//stack setup, can call C now!
 	call	_C_LABEL(initriscv)	/* Off we go */	//XXX defined in machdep.c
