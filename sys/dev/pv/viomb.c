@@ -27,6 +27,16 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+
+#include "../../../usr.bin/vmstat/dkstats.h"
+#include "../../../usr.bin/systat/systat.h"
+
+
 #include <sys/syslog.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,6 +51,7 @@
 #include <dev/pv/virtioreg.h>
 #include <dev/pv/virtiovar.h>
 
+struct uvmexp uvmexp, ouvmexp;
 
 #if VIRTIO_PAGE_SIZE!=PAGE_SIZE
 #error non-4K page sizes are not supported yet
@@ -376,19 +387,19 @@ viomb_worker(void *arg1)
 			   sc->sc_actual, sc->sc_npages);
 		viomb_deflate(sc);
 	}
-	else //not inflating or deflating so stats CMPE
-	{
-        printf("WORKER VIOMB STATS");
-        viomb_stats(sc);
-	}
 
 	sc->sc_sens[0].value = sc->sc_npages << PAGE_SHIFT;
 	sc->sc_sens[1].value = sc->sc_actual << PAGE_SHIFT;
 
 	if (sc->sc_stats_needs_update) {
-		for (i = 0; i < VIOMB_STATS_MAX; i++)
-			printf("%s: stats[%d]: tag=0x%x\n", __func__, i,
-			    sc->sc_stats_buf[i].tag);
+		sc->sc_stats_needs_update = 0;
+
+		// for (i = 0; i < VIOMB_STATS_MAX; i++)
+		// 	printf("%s: stats[%d]: tag=0x%x\n", __func__, i,
+		// 	    sc->sc_stats_buf[i].tag);
+
+		VIOMBDEBUG(sc, "getting memory statistics\n");
+        viomb_stats(sc);
 	}
 
 	splx(s);
@@ -538,15 +549,10 @@ err:
 void
 viomb_stats(struct viomb_softc *sc)
 {
-	struct virtio_softc *vsc = (struct virtio_softc *)sc->sc_virtio; // casting sc to vsc
-	//struct balloon_req *b;  
-	//struct stats_req *s;                                         // defined in viomb.c
-	//struct vm_page *p;
+	struct virtio_softc *vsc = (struct virtio_softc *)sc->sc_virtio;
 	struct virtqueue *vq = &sc->sc_vq[VQ_STATS];
 	int slot;
 
-	// if that slot is occupied,
-	//
 	if ((virtio_enqueue_prep(vq, &slot)) > 0) {
 		printf("%s:virtio_enqueue_prep() vq_num %d\n",
 		       DEVNAME(sc), vq->vq_num);
@@ -564,8 +570,13 @@ viomb_stats(struct viomb_softc *sc)
 
 	//from our "inflate" function
 
-	sc->sc_stats_buf->tag = 1;
-	sc->sc_stats_buf->val = 45;
+	//sc->sc_stats_buf->tag = 1;
+	//sc->sc_stats_buf->val = 45;
+	if (get_memory_stats_for_free(sc) == -1)
+	{
+		goto err;
+	}
+
 	bus_dmamap_sync(vsc->sc_dmat, sc->sc_stats_dmamap, 0,
 			VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat),
 			BUS_DMASYNC_PREWRITE);
@@ -577,7 +588,6 @@ viomb_stats(struct viomb_softc *sc)
 err:
 	printf("Error");
 	return;
-
 }
 
 void
@@ -692,8 +702,13 @@ viomb_deflate_intr(struct virtqueue *vq)
 
 
 /*
- * CMPE
- * Was just copied from "viomb_deflate_intr" so need to modify
+ * viomb_stats_intr 
+ *
+ * Interrupt handler for when device wants memory statistics from driver
+ * 
+ * Device filled the empty buffer with the tags of the memory statistics it wants
+ * It places the buffer in the used queue and triggers an interrupt
+ * 
  */
 
 int
@@ -716,6 +731,41 @@ viomb_stats_intr(struct virtqueue *vq)
 	return(1);
 }
 
+/*
+ * get_memory_stats_for_free
+ *
+ * Parameters:
+ *
+ * Returns:
+ *   -1: Error
+ *    1: Success
+ * 
+ */
+
+int
+get_memory_stats_for_free(struct viomb_softc *sc)
+{
+	size_t size;
+	size = sizeof(struct uvmexp);
+
+	int mib[2];
+
+	mib[0] = CTL_VM;
+	mib[1] = VM_UVMEXP;
+
+	if (sysctl(mib, 2, &uvmexp, &size, NULL, 0) == -1)
+	{
+		return -1;
+	}
+
+#define pgtok(a) ((a) * ((unsigned int)uvmexp.pagesize >> 10))
+
+	sc->sc_stats_buf->val = pgtok(uvmexp.free) / 1024;
+
+	return 1;
+}
+
+
 // //CMPE starts
 // static void viombh_vq_dequeue()
 // {
@@ -724,3 +774,4 @@ viomb_stats_intr(struct virtqueue *vq)
 // 	int idx = sc->sc_vqs->vq_queued;
 // 	printf("%s: CMPE got idx: %d\n",__func__, idx);
 // }
+
