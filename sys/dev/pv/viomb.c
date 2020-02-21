@@ -34,7 +34,7 @@
 //#include <unistd.h>
 
 //#include "../../../usr.bin/vmstat/dkstats.h"
-#include "../../../usr.bin/systat/systat.h"
+//#include "../../../usr.bin/systat/systat.h"
 
 
 #include <sys/syslog.h>
