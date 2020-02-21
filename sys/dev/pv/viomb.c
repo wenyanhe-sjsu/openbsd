@@ -757,10 +757,10 @@ get_memory_stats_for_free(struct viomb_softc *sc)
 	mib[0] = CTL_VM;
 	mib[1] = VM_UVMEXP;
 
-	if (sysctl(mib, 2, &uvmexp, &size, NULL, 0) == -1)
+	/*if (sysctl(mib, 2, &uvmexp, &size, NULL, 0) == -1)
 	{
 		return -1;
-	}
+	}*/
 
 #define pgtok(a) ((a) * ((unsigned int)uvmexp.pagesize >> 10))
 
