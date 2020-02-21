@@ -34,7 +34,7 @@
 // #include <unistd.h>
 
 //#include "../../../usr.bin/vmstat/dkstats.h"
-//#include "../../../usr.bin/systat/systat.h"
+#include "../../../usr.bin/systat/systat.h"
 
 
 #include <sys/syslog.h>
@@ -47,6 +47,8 @@
 #include <sys/sensors.h>
 
 #include <uvm/uvm_extern.h>
+#include <uvm/uvmexp.h>
+#include <sys/sysctl.h>
 
 #include <dev/pv/virtioreg.h>
 #include <dev/pv/virtiovar.h>
