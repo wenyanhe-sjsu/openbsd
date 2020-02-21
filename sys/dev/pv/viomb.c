@@ -192,6 +192,7 @@ int	viomb_deflate_intr(struct virtqueue *);
 
 /* CMPE */
 int viomb_stats_intr(struct virtqueue *);
+int get_memory_stats_for_free(struct viomb_softc *);
 
 
 struct cfattach viomb_ca = {
@@ -375,7 +376,8 @@ void
 viomb_worker(void *arg1)
 {
 	struct viomb_softc *sc = (struct viomb_softc *)arg1;
-	int s, i;
+	int s;
+	//int i;
 
 	s = splbio();
 	viomb_read_config(sc);
