@@ -31,9 +31,9 @@
 // #include <stdlib.h>
 // #include <string.h>
 // #include <time.h>
-#include <unistd.h>
+//#include <unistd.h>
 
-#include "../../../usr.bin/vmstat/dkstats.h"
+//#include "../../../usr.bin/vmstat/dkstats.h"
 #include "../../../usr.bin/systat/systat.h"
 
 
