@@ -23,3 +23,7 @@ mainbus0	at root
 cpu0		at mainbus0
 
 scsibus*        at scsi?
+
+# NS16550 compatible serial ports
+com*		at fdt?
+

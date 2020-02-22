@@ -93,8 +93,9 @@ struct cpu_info cpu_info_primary;
 struct cpu_info *cpu_info[MAXCPUS] = { &cpu_info_primary };
 
 //copied from arm64 directly
-#if 0
 extern void	com_fdt_init_cons(void);
+
+#if 0
 extern void	imxuart_init_cons(void);
 extern void	pluart_init_cons(void);
 extern void	simplefb_init_cons(bus_space_tag_t);
@@ -111,8 +112,8 @@ consinit(void)
 	consinit_called = 1;
 
 //XXX TODO: need to check how to reference them
-#if 0
 	com_fdt_init_cons();
+#if 0
 	imxuart_init_cons();
 	pluart_init_cons();
 	simplefb_init_cons(&riscv64_bs_tag);

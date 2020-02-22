@@ -53,10 +53,21 @@ file	netinet/in_cksum.c
 file	netinet/in4_cksum.c
 
 #
-# XXX simplebus
+# XXX simplebus#
+#
+# Machine-independent HID support
+#
+include	"dev/hid/files.hid"
+
+# Machine-independent I2C drivers
+include "dev/i2c/files.i2c"
+
+
 
 # FDT support
 include "dev/ofw/files.ofw"
+# Machine-independent FDT drivers
+include "dev/fdt/files.fdt"
 
 # XXX ofwbus
 # XXX timer
