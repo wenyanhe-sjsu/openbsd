@@ -751,31 +751,6 @@ riscv_clock_register(void (*initclock)(void), void (*delay)(u_int),
 	riscv_clock_func.mpstartclock = mpstartclock;
 }
 
-
-void
-delay(u_int usec)
-{
-	riscv_clock_func.delay(usec);
-}
-
-void
-cpu_initclocks(void)
-{
-	if (riscv_clock_func.initclocks == NULL)
-		panic("initclocks function not initialized yet");
-
-	riscv_clock_func.initclocks();
-}
-
-void
-cpu_startclock(void)
-{
-	if (riscv_clock_func.mpstartclock == NULL)
-		panic("startclock function not initialized yet");
-
-	riscv_clock_func.mpstartclock();
-}
-
 void
 riscv_dflt_delay(u_int usecs)
 {
@@ -786,37 +761,6 @@ riscv_dflt_delay(u_int usecs)
 		for (j = 100; j > 0; j--)
 			;
 
-}
-
-todr_chip_handle_t todr_handle;
-
-/*
- * resettodr:
- *
- *      Reset the time-of-day register with the current time.
- */
-void
-resettodr(void)
-{
-	struct timeval rtctime;
-
-	if (time_second == 1)
-		return;
-
-	microtime(&rtctime);
-
-	if (todr_handle != NULL &&
-	   todr_settime(todr_handle, &rtctime) != 0)
-		printf("resettodr: failed to set time\n");
-}
-
-void
-setstatclockrate(int new)
-{
-	if (riscv_clock_func.setstatclockrate == NULL) {
-		panic("riscv_clock_func.setstatclockrate not intialized");
-	}
-	riscv_clock_func.setstatclockrate(new);
 }
 
 void

@@ -566,6 +566,197 @@ pmap_kremove_pg(vaddr_t va)
 	/* XXX Need to actually remove the pted */
 }
 
+/*
+ * Initialize pmap setup.
+ * ALL of the code which deals with avail needs rewritten as an actual
+ * memory allocation.
+ */
+CTASSERT(sizeof(struct pmapvp0) == 2 * PAGE_SIZE);
+
+int mappings_allocated = 0;
+int pted_allocated = 0;
+
+extern char __text_start[], _etext[];
+extern char __rodata_start[], _erodata[];
+
+vaddr_t
+pmap_bootstrap(long kvo, paddr_t lpt1, long kernelstart, long kernelend,
+    long ram_start, long ram_end)
+{
+#if 0
+	void  *va;
+	paddr_t pa, pt1pa;
+	struct pmapvp1 *vp1;
+	struct pmapvp2 *vp2;
+	struct pmapvp3 *vp3;
+	struct pte_desc *pted;
+	vaddr_t vstart;
+	int i, j, k;
+	int lb_idx2, ub_idx2;
+
+	pmap_setup_avail(ram_start, ram_end, kvo);
+
+	/*
+	 * in theory we could start with just the memory in the
+	 * kernel, however this could 'allocate' the bootloader and
+	 * bootstrap vm table, which we may need to preserve until
+	 * later.
+	 */
+	printf("removing %lx-%lx\n", ram_start, kernelstart+kvo);
+	pmap_remove_avail(ram_start, kernelstart+kvo);
+	printf("removing %lx-%lx\n", kernelstart+kvo, kernelend+kvo);
+	pmap_remove_avail(kernelstart+kvo, kernelend+kvo);
+
+	/*
+	 * KERNEL IS ASSUMED TO BE 39 bits (or less), start from L1,
+	 * not L0 ALSO kernel mappings may not cover enough ram to
+	 * bootstrap so all accesses initializing tables must be done
+	 * via physical pointers
+	 */
+
+	pt1pa = pmap_steal_avail(2 * sizeof(struct pmapvp1), Lx_TABLE_ALIGN,
+	    &va);
+	vp1 = (struct pmapvp1 *)pt1pa;
+	pmap_kernel()->pm_vp.l1 = (struct pmapvp1 *)va;
+	pmap_kernel()->pm_privileged = 1;
+	pmap_kernel()->pm_asid = 0;
+
+	pmap_tramp.pm_vp.l1 = (struct pmapvp1 *)va + 1;
+	pmap_tramp.pm_privileged = 1;
+	pmap_tramp.pm_asid = 0;
+
+	/* allocate Lx entries */
+	for (i = VP_IDX1(VM_MIN_KERNEL_ADDRESS);
+	    i <= VP_IDX1(pmap_maxkvaddr - 1);
+	    i++) {
+		mappings_allocated++;
+		pa = pmap_steal_avail(sizeof(struct pmapvp2), Lx_TABLE_ALIGN,
+		    &va);
+		vp2 = (struct pmapvp2 *)pa; /* indexed physically */
+		vp1->vp[i] = va;
+		vp1->l1[i] = VP_Lx(pa);
+
+		if (i == VP_IDX1(VM_MIN_KERNEL_ADDRESS)) {
+			lb_idx2 = VP_IDX2(VM_MIN_KERNEL_ADDRESS);
+		} else {
+			lb_idx2 = 0;
+		}
+		if (i == VP_IDX1(pmap_maxkvaddr - 1)) {
+			ub_idx2 = VP_IDX2(pmap_maxkvaddr - 1);
+		} else {
+			ub_idx2 = VP_IDX2_CNT - 1;
+		}
+		for (j = lb_idx2; j <= ub_idx2; j++) {
+			mappings_allocated++;
+			pa = pmap_steal_avail(sizeof(struct pmapvp3),
+			    Lx_TABLE_ALIGN, &va);
+			vp3 = (struct pmapvp3 *)pa; /* indexed physically */
+			vp2->vp[j] = va;
+			vp2->l2[j] = VP_Lx(pa);
+
+		}
+	}
+	/* allocate Lx entries */
+	for (i = VP_IDX1(VM_MIN_KERNEL_ADDRESS);
+	    i <= VP_IDX1(pmap_maxkvaddr - 1);
+	    i++) {
+		/* access must be performed physical */
+		vp2 = (void *)((long)vp1->vp[i] + kvo);
+
+		if (i == VP_IDX1(VM_MIN_KERNEL_ADDRESS)) {
+			lb_idx2 = VP_IDX2(VM_MIN_KERNEL_ADDRESS);
+		} else {
+			lb_idx2 = 0;
+		}
+		if (i == VP_IDX1(pmap_maxkvaddr - 1)) {
+			ub_idx2 = VP_IDX2(pmap_maxkvaddr - 1);
+		} else {
+			ub_idx2 = VP_IDX2_CNT - 1;
+		}
+		for (j = lb_idx2; j <= ub_idx2; j++) {
+			/* access must be performed physical */
+			vp3 = (void *)((long)vp2->vp[j] + kvo);
+
+			for (k = 0; k <= VP_IDX3_CNT - 1; k++) {
+				pted_allocated++;
+				pa = pmap_steal_avail(sizeof(struct pte_desc),
+				    4, &va);
+				pted = va;
+				vp3->vp[k] = pted;
+			}
+		}
+	}
+
+	pa = pmap_steal_avail(Lx_TABLE_ALIGN, Lx_TABLE_ALIGN, &va);
+	memset((void *)pa, 0, Lx_TABLE_ALIGN);
+	pmap_kernel()->pm_pt0pa = pa;
+
+	/* now that we have mapping space for everything, lets map it */
+	/* all of these mappings are ram -> kernel va */
+
+	/*
+	 * enable mappings for existing 'allocated' mapping in the bootstrap
+	 * page tables
+	 */
+	extern uint64_t *pagetable;
+	extern char _end[];
+	vp2 = (void *)((long)&pagetable + kvo);
+	struct mem_region *mp;
+	ssize_t size;
+	for (mp = pmap_allocated; mp->size != 0; mp++) {
+		/* bounds may be kinda messed up */
+		for (pa = mp->start, size = mp->size & ~0xfff;
+		    size > 0;
+		    pa+= L2_SIZE, size -= L2_SIZE)
+		{
+			paddr_t mappa = pa & ~(L2_SIZE-1);
+			vaddr_t mapva = mappa - kvo;
+			int prot = PROT_READ | PROT_WRITE;
+
+			if (mapva < (vaddr_t)_end)
+				continue;
+
+			if (mapva >= (vaddr_t)__text_start &&
+			    mapva < (vaddr_t)_etext)
+				prot = PROT_READ | PROT_EXEC;
+			else if (mapva >= (vaddr_t)__rodata_start &&
+			    mapva < (vaddr_t)_erodata)
+				prot = PROT_READ;
+
+			vp2->l2[VP_IDX2(mapva)] = mappa | L2_BLOCK |
+			    ATTR_IDX(PTE_ATTR_WB) | ATTR_SH(SH_INNER) |
+			    ATTR_nG | ap_bits_kern[prot];
+		}
+	}
+
+	pmap_avail_fixup();
+
+	/*
+	 * At this point we are still running on the bootstrap page
+	 * tables however all memory for the final page tables is
+	 * 'allocated' and should now be mapped.  This means we are
+	 * able to use the virtual addressing to enter the final
+	 * mappings into the new mapping tables.
+	 */
+	vstart = pmap_map_stolen(kernelstart);
+
+	void (switch_mmu_kernel)(long);
+	void (*switch_mmu_kernel_table)(long) =
+	    (void *)((long)&switch_mmu_kernel + kvo);
+	switch_mmu_kernel_table(pt1pa);
+
+	printf("all mapped\n");
+
+	curcpu()->ci_curpm = pmap_kernel();
+
+	vmmap = vstart;
+	vstart += PAGE_SIZE;
+
+	return vstart;
+#endif
+	return 0; // Obviously wrong
+}
+
 void
 pmap_set_l1(struct pmap *pm, uint64_t va, struct pmapvp1 *l1_va)
 {
@@ -1178,4 +1369,33 @@ void
 pmap_virtual_space(vaddr_t *start, vaddr_t *end)
 {
 	// XXX Optional Function
+}
+
+/* XXX - this zeros pages via their physical address */
+paddr_t
+pmap_steal_avail(size_t size, int align, void **kva)
+{
+#if 0
+	struct mem_region *mp;
+	long start;
+	long remsize;
+
+	for (mp = pmap_avail; mp->size; mp++) {
+		if (mp->size > size) {
+			start = (mp->start + (align -1)) & ~(align -1);
+			remsize = mp->size - (start - mp->start);
+			if (remsize >= 0) {
+				pmap_remove_avail(start, start+size);
+				if (kva != NULL){
+					*kva = (void *)(start - pmap_avail_kvo);
+				}
+				bzero((void*)(start), size);
+				return start;
+			}
+		}
+	}
+	panic ("unable to allocate region with size %lx align %x",
+	    size, align);
+#endif
+	return 0; // Obviously wrong
 }

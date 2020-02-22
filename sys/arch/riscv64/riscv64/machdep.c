@@ -92,6 +92,79 @@ int safepri = 0;
 struct cpu_info cpu_info_primary;
 struct cpu_info *cpu_info[MAXCPUS] = { &cpu_info_primary };
 
+static int
+atoi(const char *s)
+{
+	int n, neg;
+
+	n = 0;
+	neg = 0;
+
+	while (*s == '-') {
+		s++;
+		neg = !neg;
+	}
+
+	while (*s != '\0') {
+		if (*s < '0' || *s > '9')
+			break;
+
+		n = (10 * n) + (*s - '0');
+		s++;
+	}
+
+	return (neg ? -n : n);
+}
+
+
+void *
+fdt_find_cons(const char *name)
+{
+	char *alias = "serial0";
+	char buf[128];
+	char *stdout = NULL;
+	char *p;
+	void *node;
+
+	/* First check if "stdout-path" is set. */
+	node = fdt_find_node("/chosen");
+	if (node) {
+		if (fdt_node_property(node, "stdout-path", &stdout) > 0) {
+			if (strchr(stdout, ':') != NULL) {
+				strlcpy(buf, stdout, sizeof(buf));
+				if ((p = strchr(buf, ':')) != NULL) {
+					*p++ = '\0';
+					stdout_speed = atoi(p);
+				}
+				stdout = buf;
+			}
+			if (stdout[0] != '/') {
+				/* It's an alias. */
+				alias = stdout;
+				stdout = NULL;
+			}
+		}
+	}
+
+	/* Perform alias lookup if necessary. */
+	if (stdout == NULL) {
+		node = fdt_find_node("/aliases");
+		if (node)
+			fdt_node_property(node, alias, &stdout);
+	}
+
+	/* Lookup the physical address of the interface. */
+	if (stdout) {
+		node = fdt_find_node(stdout);
+		if (node && fdt_is_compatible(node, name)) {
+			stdout_node = OF_finddevice(stdout);
+			return (node);
+		}
+	}
+
+	return (NULL);
+}
+
 //copied from arm64 directly
 extern void	com_fdt_init_cons(void);
 
@@ -355,6 +428,45 @@ cpu_dumpsize(void)
 	return (1);
 }
 
+int64_t dcache_line_size;	/* The minimum D cache line size */
+int64_t icache_line_size;	/* The minimum I cache line size */
+int64_t idcache_line_size;	/* The minimum cache line size */
+int64_t dczva_line_size;	/* The size of cache line the dc zva zeroes */
+
+void
+cache_setup(void)
+{
+#if 0	// XXX TODO CMPE
+	int dcache_line_shift, icache_line_shift, dczva_line_shift;
+	uint32_t ctr_el0;
+	uint32_t dczid_el0;
+
+	ctr_el0 = READ_SPECIALREG(ctr_el0);
+
+	/* Read the log2 words in each D cache line */
+	dcache_line_shift = CTR_DLINE_SIZE(ctr_el0);
+	/* Get the D cache line size */
+	dcache_line_size = sizeof(int) << dcache_line_shift;
+
+	/* And the same for the I cache */
+	icache_line_shift = CTR_ILINE_SIZE(ctr_el0);
+	icache_line_size = sizeof(int) << icache_line_shift;
+
+	idcache_line_size = MIN(dcache_line_size, icache_line_size);
+
+	dczid_el0 = READ_SPECIALREG(dczid_el0);
+
+	/* Check if dc zva is not prohibited */
+	if (dczid_el0 & DCZID_DZP)
+		dczva_line_size = 0;
+	else {
+		/* Same as with above calculations */
+		dczva_line_shift = DCZID_BS_SIZE(dczid_el0);
+		dczva_line_size = sizeof(int) << dczva_line_shift;
+	}
+#endif
+}
+
 u_long
 cpu_dump_mempagecnt()
 {
@@ -433,12 +545,10 @@ void	process_kernel_args(void);
 void
 initriscv(struct riscv_bootparams *rbp)
 {
-#if 0	// XXX not yet used
-	// vaddr_t vstart, vend;
-	// struct cpu_info *pcpup;
-	// long kvo = 0x0; // XXX VA --> PA delta
-	// paddr_t memstart, memend;
-#endif  // 0
+	vaddr_t vstart; //, vend; // XXX vend not yet used
+	struct cpu_info *pcpup;
+	long kvo = 0x0; // XXX VA --> PA delta
+	paddr_t memstart, memend;
 #if 0
 	// XXX What?
 	int (*map_func_save)(bus_space_tag_t, bus_addr_t, bus_size_t, int,
@@ -506,11 +616,11 @@ initriscv(struct riscv_bootparams *rbp)
 #endif
 	}
 
-#if 0
 	/* Set the pcpu data, this is needed by pmap_bootstrap */
 	// smp
 	pcpup = &cpu_info_primary;
 
+#if 0	// XXX What?
 	/*
 	 * Set the pcpu pointer with a backup in tpidr_el1 to be
 	 * loaded when entering the kernel from userland.
@@ -518,6 +628,7 @@ initriscv(struct riscv_bootparams *rbp)
 	__asm __volatile(
 	    "mov x18, %0 \n"
 	    "msr tpidr_el1, %0" :: "r"(pcpup));
+#endif
 
 	cache_setup();
 
@@ -548,6 +659,7 @@ initriscv(struct riscv_bootparams *rbp)
 	copy_dst_page = vstart;
 	vstart += MAXCPUS * PAGE_SIZE;
 
+#if 0
 	/* Relocate the FDT to safe memory. */
 	if (fdt_get_size(config) != 0) {
 		uint32_t csize, size = round_page(fdt_get_size(config));
