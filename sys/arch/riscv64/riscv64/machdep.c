@@ -545,10 +545,11 @@ void	process_kernel_args(void);
 void
 initriscv(struct riscv_bootparams *rbp)
 {
-	vaddr_t vstart; //, vend; // XXX vend not yet used
+	vaddr_t vstart, vend;
 	struct cpu_info *pcpup;
 	long kvo = 0x0; // XXX VA --> PA delta
 	paddr_t memstart, memend;
+	void *fdt = (void *) rbp->dtbp_virt; // XXX Cast?
 #if 0
 	// XXX What?
 	int (*map_func_save)(bus_space_tag_t, bus_addr_t, bus_size_t, int,
@@ -659,7 +660,7 @@ initriscv(struct riscv_bootparams *rbp)
 	copy_dst_page = vstart;
 	vstart += MAXCPUS * PAGE_SIZE;
 
-#if 0
+#if 0	// XXX FDT already mapped to safe memory?
 	/* Relocate the FDT to safe memory. */
 	if (fdt_get_size(config) != 0) {
 		uint32_t csize, size = round_page(fdt_get_size(config));
@@ -675,7 +676,9 @@ initriscv(struct riscv_bootparams *rbp)
 		fdt = (void *)vstart;
 		vstart += size;
 	}
+#endif
 
+#if 0	// XXX No EFI?
 	/* Relocate the EFI memory map too. */
 	if (mmap_start != 0) {
 		uint32_t csize, size = round_page(mmap_size);
@@ -699,6 +702,7 @@ initriscv(struct riscv_bootparams *rbp)
 		mmap = (void *)vstart;
 		vstart += size;
 	}
+#endif
 
 	/*
 	 * Managed KVM space is what we have claimed up to end of
@@ -715,6 +719,7 @@ initriscv(struct riscv_bootparams *rbp)
 	/* Now we can reinit the FDT, using the virtual address. */
 	if (fdt)
 		fdt_init(fdt);
+#if 0
 
 	// XXX
 	int pmap_bootstrap_bs_map(bus_space_tag_t t, bus_addr_t bpa,

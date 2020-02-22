@@ -1399,3 +1399,6 @@ pmap_steal_avail(size_t size, int align, void **kva)
 #endif
 	return 0; // Obviously wrong
 }
+
+vaddr_t virtual_avail, virtual_end;
+int	pmap_virtual_space_called;
