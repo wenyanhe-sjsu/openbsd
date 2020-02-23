@@ -89,7 +89,7 @@ struct ctl_command ctl_commands[] = {
 	{ "stop",	CMD_STOP,	ctl_stop,	"[-fw] [id | -a]" },
 	{ "unpause",	CMD_UNPAUSE,	ctl_unpause,	"id" },
 	{ "wait",	CMD_WAITFOR,	ctl_waitfor,	"id" },
-	{ "getStats",	CMD_GETSTATS,	ctl_getStats,	"id" },
+	{ "stats",	CMD_GETSTATS,	ctl_getStats,	"[id | -a]" },
 	{ NULL }
 };
 

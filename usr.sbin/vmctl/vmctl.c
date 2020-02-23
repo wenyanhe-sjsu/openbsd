@@ -951,11 +951,22 @@ create_imagefile(int type, const char *imgfile_path, const char *base_path,
 }
 
 // vmctl get memory status information from VMs
-int vm_getStats(uint32_t start_id, const char *name, enum actions action)
+void 
+vm_getStats(uint32_t start_id, const char *name, enum actions action)
 {
-	get_info_vm(NULL, NULL, CMD_CONSOLE, NULL );
-	printf("CMPE vm_getStats ");
-	return 0;
+	struct vmop_id vid;
+
+	memset(&vid, 0, sizeof(vid));
+	vid.vid_id = start_id;
+	if (name != NULL) {
+		(void)strlcpy(vid.vid_name, name, sizeof(vid.vid_name));
+		fprintf(stderr, "getting memory statistics of VM %s: ", name);
+	} else {
+		fprintf(stderr, "getting memory statistics of all VMs: ");
+	}
+
+	imsg_compose(ibuf,  IMSG_VMDOP_GET_VM_STATS_REQUEST,
+	    0, 0, -1, &vid, sizeof(vid));
 }
 
 // CMPE
