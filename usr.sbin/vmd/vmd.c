@@ -161,6 +161,9 @@ vmd_dispatch_control(int fd, struct privsep_proc *p, struct imsg *imsg)
 	case IMSG_VMDOP_GET_INFO_VM_REQUEST:
 		proc_forward_imsg(ps, imsg, PROC_VMM, -1);
 		break;
+	case IMSG_VMDOP_GET_VM_STATS_REQUEST:
+		proc_forward_imsg(ps, imsg, PROC_VMM, -1);
+		break;
 	case IMSG_VMDOP_LOAD:
 		IMSG_SIZE_CHECK(imsg, str); /* at least one byte for path */
 		str = get_string((uint8_t *)imsg->data,
