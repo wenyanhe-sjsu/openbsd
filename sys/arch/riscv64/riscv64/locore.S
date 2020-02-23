@@ -319,6 +319,7 @@ _C_LABEL(esym): .quad	_C_LABEL(end)
 	.align	12
 pagetable_l1:
 	.space	PAGE_SIZE
+	.globl	pagetable_l2	// Used in pmap.c
 pagetable_l2:
 	.space	PAGE_SIZE
 pagetable_l2_devmap:
