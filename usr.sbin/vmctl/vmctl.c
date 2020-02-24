@@ -976,27 +976,60 @@ get_num_vm(struct imsg *imsg, int *ret)
 {
 	static size_t ct = 0;
 	static struct vmop_info_result *vir = NULL;
-	vm_counter = -1;
 
-	printf("CMPE imsg header type - %d", imsg->hdr.type); 
-
-	if (imsg->hdr.type == IMSG_VMDOP_GET_INFO_VM_DATA) {
+	if (imsg->hdr.type == IMSG_VMDOP_GET_VM_STATS_RESPONSE) {
 		vir = reallocarray(vir, ct + 1,
 		    sizeof(struct vmop_info_result));
 		if (vir == NULL) {
 			*ret = ENOMEM;
+			return (1);
 		}
-		else {
-			memcpy(&vir[ct], imsg->data, sizeof(struct vmop_info_result));
-			ct++;
-			*ret = 0;
-			vm_counter = ct;
-			printf("CMPE imsg after counter - %d", vm_counter); 
-		}		
-	}	
-	else {
+		memcpy(&vir[ct], imsg->data, sizeof(struct vmop_info_result));
+		ct++;
 		*ret = 0;
-		printf("CMPE imsg counter - %zu", ct);
+		return (0);
+	} else if (imsg->hdr.type == IMSG_VMDOP_GET_VM_STATS_END_RESPONSE) {
+		switch (info_action) {
+		case CMD_CONSOLE:
+			vm_console(vir, ct);
+			break;
+		case CMD_STOPALL:
+			terminate_all(vir, ct, info_flags);
+			break;
+		default:
+			print_vm_info(vir, ct);
+			break;
+		}
+		free(vir);
+		*ret = 0;
+		return (1);
+	} else {
+		*ret = EINVAL;
+		return (1);
 	}
+	// static size_t ct = 0;
+	// static struct vmop_info_result *vir = NULL;
+	// vm_counter = -1;
+
+	// printf("CMPE imsg header type - %d", imsg->hdr.type); 
+
+	// if (imsg->hdr.type == IMSG_VMDOP_GET_INFO_VM_DATA) {
+	// 	vir = reallocarray(vir, ct + 1,
+	// 	    sizeof(struct vmop_info_result));
+	// 	if (vir == NULL) {
+	// 		*ret = ENOMEM;
+	// 	}
+	// 	else {
+	// 		memcpy(&vir[ct], imsg->data, sizeof(struct vmop_info_result));
+	// 		ct++;
+	// 		*ret = 0;
+	// 		vm_counter = ct;
+	// 		printf("CMPE imsg after counter - %d", vm_counter); 
+	// 	}		
+	// }	
+	// else {
+	// 	*ret = 0;
+	// 	printf("CMPE imsg counter - %zu", ct);
+	// }
 }
 
