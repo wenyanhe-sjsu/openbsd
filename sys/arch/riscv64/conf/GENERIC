@@ -27,3 +27,5 @@ scsibus*        at scsi?
 # NS16550 compatible serial ports
 com*		at fdt?
 
+# simplefb*	at fdt?//required?
+

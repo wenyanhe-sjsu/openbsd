@@ -165,14 +165,16 @@ fdt_find_cons(const char *name)
 	return (NULL);
 }
 
-//copied from arm64 directly
-extern void	com_fdt_init_cons(void);
-
-#if 0
+#if 0	//	CMPE: not supporting following uarts
+extern void	amluart_init_cons(void);
 extern void	imxuart_init_cons(void);
+extern void	mvuart_init_cons(void);
 extern void	pluart_init_cons(void);
+#endif 
+
+extern void	com_fdt_init_cons(void);
 extern void	simplefb_init_cons(bus_space_tag_t);
-#endif
+
 
 void
 consinit(void)
@@ -183,15 +185,19 @@ consinit(void)
 		return;
 
 	consinit_called = 1;
-
-//XXX TODO: need to check how to reference them
-	com_fdt_init_cons();
-#if 0
+#if 0 //no support
+	amluart_init_cons();
 	imxuart_init_cons();
+	mvuart_init_cons();
 	pluart_init_cons();
+#endif
+	com_fdt_init_cons();
+
+#if 0 // XXX: CMPE, necessary?
 	simplefb_init_cons(&riscv64_bs_tag);
 #endif
 }
+
 
 //XXX TODO: need to populate console for qemu
 struct consdev constab[] = {
@@ -555,7 +561,7 @@ initriscv(struct riscv_bootparams *rbp)
 	int (*map_func_save)(bus_space_tag_t, bus_addr_t, bus_size_t, int,
 	    bus_space_handle_t *);
 #endif  // 0
-	// NOTE: FDT is already mapped (rpb->dtbp_virt & rpb->dtbp_phys)
+	// NOTE: FDT is already mapped (rbp->dtbp_virt & rbp->dtbp_phys)
 	
 	// struct fdt_reg reg; // XXX not yet used
 	void *node;
@@ -564,11 +570,13 @@ initriscv(struct riscv_bootparams *rbp)
 	if (node != NULL) {
 		char *prop;
 		int len;
-		static uint8_t lladdr[6];
+		// static uint8_t lladdr[6]; //not yet used
 
 		len = fdt_node_property(node, "bootargs", &prop);
 		if (len > 0)
 			collect_kernel_args(prop);
+
+#if 0 //CMPE: yet not using these properties
 
 		len = fdt_node_property(node, "openbsd,bootduid", &prop);
 		if (len == sizeof(bootduid))
@@ -608,9 +616,6 @@ initriscv(struct riscv_bootparams *rbp)
 		len = fdt_node_property(node, "openbsd,uefi-mmap-desc-ver", &prop);
 		if (len == sizeof(mmap_desc_ver))
 			mmap_desc_ver = bemtoh32((uint32_t *)prop);
-
-#if 0
-		// XXX What?
 		len = fdt_node_property(node, "openbsd,uefi-system-table", &prop);
 		if (len == sizeof(system_table))
 			system_table = bemtoh64((uint64_t *)prop);
