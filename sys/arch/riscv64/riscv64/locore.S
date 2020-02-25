@@ -254,7 +254,10 @@ va:					//XXX just a trampoline?
 
 	la	t0, pagetable_l1
 	sd	t0, KERN_L1PT(sp)
-	sd	s9, KERN_PHYS(sp)
+
+	li	t0, KERNBASE
+	sub	t0, s9, t0	//offset: PA - VA, used in pmap_*
+	sd	t0, KERN_DELTA(sp)
 
 	la	t0, initstack
 	sd	t0, KERN_STACK(sp)
