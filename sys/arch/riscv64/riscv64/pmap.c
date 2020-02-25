@@ -1153,6 +1153,44 @@ int pted_allocated = 0;
 extern char __text_start[], _etext[];
 extern char __rodata_start[], _erodata[];
 
+paddr_t dmap_phys_base;
+paddr_t dmap_phys_max;
+vaddr_t dmap_virt_base;
+vaddr_t dmap_virt_max;
+
+static void
+pmap_bootstrap_dmap(vaddr_t kern_l1, paddr_t min_pa, paddr_t max_pa)
+{
+	vaddr_t va;
+	paddr_t pa;
+	pd_entry_t *l1;
+	u_int l1_slot;
+	pt_entry_t entry;
+	pn_t pn;
+
+	pa = dmap_phys_base = min_pa & ~L1_OFFSET;  // 1 GiB Align
+	va = DMAP_MIN_ADDRESS;
+	l1 = (pd_entry_t *)kern_l1;
+	l1_slot = VP_IDX0(DMAP_MIN_ADDRESS);
+
+	for (; va < DMAP_MAX_ADDRESS && pa < max_pa;
+	    pa += L1_SIZE, va += L1_SIZE, l1_slot++) {
+		KASSERT(l1_slot < Ln_ENTRIES);
+
+		/* superpages */
+		pn = (pa / PAGE_SIZE);
+		entry = PTE_KERN;
+		entry |= (pn << PTE_PPN0_S);
+		atomic_store_64(&l1[l1_slot], entry);
+	}
+
+	/* set the upper limit of the dmap region */
+	dmap_phys_max = pa;
+	dmap_virt_max = va;
+
+	sfence_vma();
+}
+
 vaddr_t
 pmap_bootstrap(long kvo, paddr_t lpt1, long kernelstart, long kernelend,
     long ram_start, long ram_end)
@@ -1188,6 +1226,7 @@ pmap_bootstrap(long kvo, paddr_t lpt1, long kernelstart, long kernelend,
 	 * bootstrap so all accesses initializing tables must be done
 	 * via physical pointers
 	 */
+	pmap_bootstrap_dmap(0, 0, 0);
 
 	pt1pa = pmap_steal_avail(2 * sizeof(struct pmapvp1), Lx_TABLE_ALIGN,
 	    &va);

@@ -31,6 +31,15 @@ atomic_setbits_int(volatile unsigned int *p, unsigned int v)
 	    : "memory");
 }
 
+static inline void
+atomic_store_64(volatile uint64_t *p, uint64_t v)
+{
+	__asm __volatile("ammor.d zero, %1, (%0)"
+			: "+A" (p)
+			: "r" (v)
+			: "memory");
+}
+
 /*
  * Clear bits
  * *p = *p & (~v)
