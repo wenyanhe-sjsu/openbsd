@@ -1226,7 +1226,8 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, long kernelstart, long kernelend,
 	 * bootstrap so all accesses initializing tables must be done
 	 * via physical pointers
 	 */
-	pmap_bootstrap_dmap(0, 0, 0);
+	// XXX Need to determine physical address range. For now, force 1 mapping.
+	pmap_bootstrap_dmap(l1pt, 0x0, 0x1);
 
 	pt1pa = pmap_steal_avail(2 * sizeof(struct pmapvp1), Lx_TABLE_ALIGN,
 	    &va);
