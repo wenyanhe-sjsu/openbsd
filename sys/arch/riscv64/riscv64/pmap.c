@@ -1175,9 +1175,11 @@ pmap_bootstrap(long kvo, paddr_t lpt1, long kernelstart, long kernelend,
 	 * bootstrap vm table, which we may need to preserve until
 	 * later.
 	 */
-	printf("removing %lx-%lx\n", ram_start, kernelstart+kvo);
+	// XXX Console not initialized yet. Uncomment when printf works.
+	// printf("removing %lx-%lx\n", ram_start, kernelstart+kvo);
 	pmap_remove_avail(ram_start, kernelstart+kvo);
-	printf("removing %lx-%lx\n", kernelstart+kvo, kernelend+kvo);
+	// XXX Console not initialized yet. Uncomment when printf works.
+	// printf("removing %lx-%lx\n", kernelstart+kvo, kernelend+kvo);
 	pmap_remove_avail(kernelstart+kvo, kernelend+kvo);
 
 	/*
