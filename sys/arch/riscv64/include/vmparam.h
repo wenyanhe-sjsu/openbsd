@@ -158,7 +158,6 @@
 #ifndef _LOCORE
 extern paddr_t dmap_phys_base;
 extern paddr_t dmap_phys_max;
-extern vaddr_t dmap_virt_base;
 extern vaddr_t dmap_virt_max;
 extern vaddr_t vm_max_kernel_address;
 extern vaddr_t init_pt_va;

@@ -1155,7 +1155,6 @@ extern char __rodata_start[], _erodata[];
 
 paddr_t dmap_phys_base;
 paddr_t dmap_phys_max;
-vaddr_t dmap_virt_base;
 vaddr_t dmap_virt_max;
 
 static void
