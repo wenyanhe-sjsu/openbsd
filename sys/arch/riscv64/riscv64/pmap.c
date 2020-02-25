@@ -1171,7 +1171,7 @@ pmap_bootstrap_dmap(vaddr_t kern_l1, paddr_t min_pa, paddr_t max_pa)
 	pa = dmap_phys_base = min_pa & ~L1_OFFSET;  // 1 GiB Align
 	va = DMAP_MIN_ADDRESS;
 	l1 = (pd_entry_t *)kern_l1;
-	l1_slot = VP_IDX0(DMAP_MIN_ADDRESS);
+	l1_slot = VP_IDX1(DMAP_MIN_ADDRESS);
 
 	for (; va < DMAP_MAX_ADDRESS && pa < max_pa;
 	    pa += L1_SIZE, va += L1_SIZE, l1_slot++) {
