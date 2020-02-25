@@ -1192,7 +1192,7 @@ pmap_bootstrap_dmap(vaddr_t kern_l1, paddr_t min_pa, paddr_t max_pa)
 }
 
 vaddr_t
-pmap_bootstrap(long kvo, paddr_t lpt1, long kernelstart, long kernelend,
+pmap_bootstrap(long kvo, vaddr_t l1pt, long kernelstart, long kernelend,
     long ram_start, long ram_end)
 {
 	void  *va;
