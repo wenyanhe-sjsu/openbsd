@@ -495,6 +495,9 @@ struct vm_info_result {
 	pid_t		vir_creator_pid;
 	uint32_t	vir_id;
 	char		vir_name[VMM_MAX_NAME_LEN];
+
+	/* Additional stats */
+	int		vir_swpginuse;
 };
 
 struct vm_info_params {

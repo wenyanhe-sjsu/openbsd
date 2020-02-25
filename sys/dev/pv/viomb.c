@@ -26,17 +26,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include <time.h>
-//#include <unistd.h>
-
-//#include "../../../usr.bin/vmstat/dkstats.h"
-//#include "../../../usr.bin/systat/systat.h"
-
-
 #include <sys/syslog.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -67,8 +56,6 @@ struct uvmexp uvmexp, ouvmexp;
 #else
 #define VIOMBDEBUG(...)
 #endif
-
-#define CMPE_VIOMB_DEBUG 1
 
 /* flags used to specify kind of operation,
  * actually should be moved to virtiovar.h
@@ -127,9 +114,9 @@ static const struct virtio_feature_name viomb_feature_names[] = {
  *
  */
 struct balloon_req {
-	bus_dmamap_t	 bl_dmamap; //not needed for statsq, dynamic memory allocation
+	bus_dmamap_t	 bl_dmamap;
 	struct pglist	 bl_pglist;
-	int		 bl_nentries;		// (sc_npages) # pages that driver will give in the current go
+	int		 bl_nentries;
 	u_int32_t	*bl_pages;
 };
 

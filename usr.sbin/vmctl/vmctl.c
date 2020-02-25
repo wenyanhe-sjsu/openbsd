@@ -746,13 +746,14 @@ print_vm_info(struct vmop_info_result *list, size_t ct)
 	size_t i;
 	char *tty;
 	char curmem[FMT_SCALED_STRSIZE];
+	char swap[FMT_SCALED_STRSIZE];
 	char maxmem[FMT_SCALED_STRSIZE];
 	char user[16], group[16];
 	const char *name;
 	int running;
 
-	printf("%5s %5s %5s %7s %7s %7s %12s %8s %s\n", "ID", "PID", "VCPUS",
-	    "MAXMEM", "CURMEM", "TTY", "OWNER", "STATE", "NAME");
+	printf("%5s %5s %5s %7s %7s %7s %7s %12s %8s %s\n", "ID", "PID", "VCPUS",
+	    "MAXMEM", "CURMEM", "SWAP", "TTY", "OWNER", "STATE", "NAME");
 
 	for (i = 0; i < ct; i++) {
 		vmi = &list[i];
@@ -780,6 +781,7 @@ print_vm_info(struct vmop_info_result *list, size_t ct)
 
 			(void)strlcpy(curmem, "-", sizeof(curmem));
 			(void)strlcpy(maxmem, "-", sizeof(maxmem));
+			(void)strlcpy(swap, "-", sizeof(swap));
 
 			(void)fmt_scaled(vir->vir_memory_size * 1024 * 1024,
 			    maxmem);
@@ -793,18 +795,20 @@ print_vm_info(struct vmop_info_result *list, size_t ct)
 					tty = list[i].vir_ttyname;
 
 				(void)fmt_scaled(vir->vir_used_size, curmem);
+				/* Needs mult by 4k XXX */
+				(void)fmt_scaled(vir->vir_swpginuse, swap);
 
 				/* running vm */
-				printf("%5u %5u %5zd %7s %7s %7s %12s %8s %s\n",
+				printf("%5u %5u %5zd %7s %7s %7s %7s %12s %8s %s\n",
 				    vir->vir_id, vir->vir_creator_pid,
-				    vir->vir_ncpus, maxmem, curmem,
+				    vir->vir_ncpus, maxmem, curmem, swap,
 				    tty, user, vm_state(vmi->vir_state),
 				    vir->vir_name);
 			} else {
 				/* disabled vm */
-				printf("%5u %5s %5zd %7s %7s %7s %12s %8s %s\n",
+				printf("%5u %5s %5zd %7s %7s %7s %7s %12s %8s %s\n",
 				    vir->vir_id, "-",
-				    vir->vir_ncpus, maxmem, curmem,
+				    vir->vir_ncpus, maxmem, curmem, swap,
 				    "-", user, vm_state(vmi->vir_state),
 				    vir->vir_name);
 			}
@@ -951,7 +955,7 @@ create_imagefile(int type, const char *imgfile_path, const char *base_path,
 }
 
 // vmctl get memory status information from VMs
-void 
+void
 vm_getStats(uint32_t start_id, const char *name, enum actions action)
 {
 	struct vmop_id vid;
@@ -969,8 +973,6 @@ vm_getStats(uint32_t start_id, const char *name, enum actions action)
 	    0, 0, -1, &vid, sizeof(vid));
 }
 
-// CMPE
-
 void
 get_num_vm(struct imsg *imsg, int *ret)
 {
@@ -982,12 +984,12 @@ get_num_vm(struct imsg *imsg, int *ret)
 		    sizeof(struct vmop_info_result));
 		if (vir == NULL) {
 			*ret = ENOMEM;
-			return (1);
+			return;
 		}
 		memcpy(&vir[ct], imsg->data, sizeof(struct vmop_info_result));
 		ct++;
 		*ret = 0;
-		return (0);
+		return;
 	} else if (imsg->hdr.type == IMSG_VMDOP_GET_VM_STATS_END_RESPONSE) {
 		switch (info_action) {
 		case CMD_CONSOLE:
@@ -1002,16 +1004,16 @@ get_num_vm(struct imsg *imsg, int *ret)
 		}
 		free(vir);
 		*ret = 0;
-		return (1);
+		return;
 	} else {
 		*ret = EINVAL;
-		return (1);
+		return;
 	}
 	// static size_t ct = 0;
 	// static struct vmop_info_result *vir = NULL;
 	// vm_counter = -1;
 
-	// printf("CMPE imsg header type - %d", imsg->hdr.type); 
+	// printf("CMPE imsg header type - %d", imsg->hdr.type);
 
 	// if (imsg->hdr.type == IMSG_VMDOP_GET_INFO_VM_DATA) {
 	// 	vir = reallocarray(vir, ct + 1,
@@ -1024,9 +1026,9 @@ get_num_vm(struct imsg *imsg, int *ret)
 	// 		ct++;
 	// 		*ret = 0;
 	// 		vm_counter = ct;
-	// 		printf("CMPE imsg after counter - %d", vm_counter); 
-	// 	}		
-	// }	
+	// 		printf("CMPE imsg after counter - %d", vm_counter);
+	// 	}
+	// }
 	// else {
 	// 	*ret = 0;
 	// 	printf("CMPE imsg counter - %zu", ct);

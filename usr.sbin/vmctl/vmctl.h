@@ -116,7 +116,7 @@ void	 print_vm_info(struct vmop_info_result *, size_t);
 void	 terminate_all(struct vmop_info_result *, size_t, unsigned int);
 __dead void
 	 vm_console(struct vmop_info_result *, size_t);
-int vm_getStats(uint32_t start_id, const char *name, enum actions action);
+void vm_getStats(uint32_t start_id, const char *name, enum actions action);
 void get_num_vm(struct imsg *imsg, int *ret);
 
 #endif /* VMCTL_PARSER_H */

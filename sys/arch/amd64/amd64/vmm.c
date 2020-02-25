@@ -3716,6 +3716,7 @@ vm_get_info(struct vm_info_params *vip)
 		out[i].vir_id = vm->vm_id;
 		out[i].vir_creator_pid = vm->vm_creator_pid;
 		strncpy(out[i].vir_name, vm->vm_name, VMM_MAX_NAME_LEN);
+		out[i].vir_swpginuse = uvmexp.swpginuse;
 		rw_enter_read(&vm->vm_vcpu_lock);
 		for (j = 0; j < vm->vm_vcpu_ct; j++) {
 			out[i].vir_vcpu_state[j] = VCPU_STATE_UNKNOWN;

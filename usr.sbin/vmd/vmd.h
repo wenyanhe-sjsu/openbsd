@@ -43,7 +43,6 @@
 
 #define VMD_USER		"_vmd"
 #define VMD_CONF		"/etc/vm.conf"
-#define VMD_CONF		"/etc/examples/vm.conf"
 #define SOCKET_NAME		"/var/run/vmd.sock"
 #define VMM_NODE		"/dev/vmm"
 #define VM_DEFAULT_BIOS		"/etc/firmware/vmm-bios"
