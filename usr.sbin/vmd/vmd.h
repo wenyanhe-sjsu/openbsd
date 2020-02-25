@@ -43,6 +43,7 @@
 
 #define VMD_USER		"_vmd"
 #define VMD_CONF		"/etc/vm.conf"
+#define VMD_CONF		"/etc/examples/vm.conf"
 #define SOCKET_NAME		"/var/run/vmd.sock"
 #define VMM_NODE		"/dev/vmm"
 #define VM_DEFAULT_BIOS		"/etc/firmware/vmm-bios"
@@ -109,6 +110,9 @@ enum imsg_type {
 	IMSG_VMDOP_GET_INFO_VM_REQUEST,
 	IMSG_VMDOP_GET_INFO_VM_DATA,
 	IMSG_VMDOP_GET_INFO_VM_END_DATA,
+	IMSG_VMDOP_GET_VM_STATS_REQUEST,
+	IMSG_VMDOP_GET_VM_STATS_RESPONSE,
+	IMSG_VMDOP_GET_VM_STATS_END_RESPONSE,
 	IMSG_VMDOP_LOAD,
 	IMSG_VMDOP_RELOAD,
 	IMSG_VMDOP_PRIV_IFDESCR,
@@ -352,6 +356,10 @@ struct vmd {
 	int			 vmd_fd;
 	int			 vmd_fd6;
 	int			 vmd_ptmfd;
+	 /* Memory balloon settings from vm.conf */
+	int			 vmb_lowat;
+    int          vmb_hiwat;
+    int          vmb_reclaim;
 };
 
 static inline struct sockaddr_in *

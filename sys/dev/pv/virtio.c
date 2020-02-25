@@ -74,6 +74,7 @@ virtio_device_string(int id)
 	return id < NDEVNAMES ? virtio_device_name[id] : "Unknown";
 }
 
+//#if VIRTIO_DEBUG
 static const struct virtio_feature_name transport_feature_names[] = {
 	{ VIRTIO_F_NOTIFY_ON_EMPTY,	"NotifyOnEmpty"},
 	{ VIRTIO_F_RING_INDIRECT_DESC,	"RingIndirectDesc"},
@@ -114,6 +115,7 @@ virtio_log_features(uint64_t host, uint64_t neg,
 			printf(" %cUnknown(%d)", c, i);
 	}
 }
+//#endif
 
 /*
  * Reset the device.
@@ -927,6 +929,10 @@ virtio_nused(struct virtqueue *vq)
 	return n;
 }
 
+<<<<<<< HEAD
+=======
+//#if VIRTIO_DEBUG
+>>>>>>> 1d0a5d449d98b7fbf69dee0082184ffe81c3bd3a
 void
 virtio_vq_dump(struct virtqueue *vq)
 {
@@ -947,3 +953,7 @@ virtio_vq_dump(struct virtqueue *vq)
 	printf(" + used event: %d\n", VQ_USED_EVENT(vq));
 	printf(" +++++++++++++++++++++++++++\n");
 }
+<<<<<<< HEAD
+=======
+//#endif
+>>>>>>> 1d0a5d449d98b7fbf69dee0082184ffe81c3bd3a
