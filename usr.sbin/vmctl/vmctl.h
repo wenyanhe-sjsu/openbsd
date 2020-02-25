@@ -38,6 +38,7 @@ enum actions {
 	CMD_UNPAUSE,
 	CMD_SEND,
 	CMD_RECEIVE,
+	CMD_GETSTATS
 };
 
 struct ctl_command;
@@ -72,6 +73,7 @@ struct ctl_command {
 };
 
 struct imsgbuf	*ibuf;
+static int 		vm_counter = 0;
 
 /* main.c */
 int	 vmmaction(struct parse_result *);
@@ -114,5 +116,7 @@ void	 print_vm_info(struct vmop_info_result *, size_t);
 void	 terminate_all(struct vmop_info_result *, size_t, unsigned int);
 __dead void
 	 vm_console(struct vmop_info_result *, size_t);
+int vm_getStats(uint32_t start_id, const char *name, enum actions action);
+void get_num_vm(struct imsg *imsg, int *ret);
 
 #endif /* VMCTL_PARSER_H */

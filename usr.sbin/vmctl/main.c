@@ -45,8 +45,8 @@
 #define QCOW2_FMT	"qcow2"
 
 static const char	*socket_name = SOCKET_NAME;
-static int		 ctl_sock = -1;
-static int		 tty_autoconnect = 0;
+static int		 	ctl_sock = -1;
+static int		 	tty_autoconnect = 0;
 
 __dead void	 usage(void);
 __dead void	 ctl_usage(struct ctl_command *);
@@ -68,6 +68,7 @@ int		 ctl_pause(struct parse_result *, int, char *[]);
 int		 ctl_unpause(struct parse_result *, int, char *[]);
 int		 ctl_send(struct parse_result *, int, char *[]);
 int		 ctl_receive(struct parse_result *, int, char *[]);
+int		 ctl_getStats(struct parse_result *, int, char *[]);
 
 struct ctl_command ctl_commands[] = {
 	{ "console",	CMD_CONSOLE,	ctl_console,	"id" },
@@ -88,6 +89,7 @@ struct ctl_command ctl_commands[] = {
 	{ "stop",	CMD_STOP,	ctl_stop,	"[-fw] [id | -a]" },
 	{ "unpause",	CMD_UNPAUSE,	ctl_unpause,	"id" },
 	{ "wait",	CMD_WAITFOR,	ctl_waitfor,	"id" },
+	{ "stats",	CMD_GETSTATS,	ctl_getStats,	"[id | -a]" },
 	{ NULL }
 };
 
@@ -236,6 +238,7 @@ vmmaction(struct parse_result *res)
 	case CMD_STATUS:
 	case CMD_CONSOLE:
 	case CMD_STOPALL:
+		printf("CMPE - %s -%d", res->name, res->flags);
 		get_info_vm(res->id, res->name, res->action, res->flags);
 		break;
 	case CMD_LOAD:
@@ -269,6 +272,9 @@ vmmaction(struct parse_result *res)
 		break;
 	case CMD_RECEIVE:
 		vm_receive(res->id, res->name);
+		break;
+	case CMD_GETSTATS:
+		vm_getStats(res->id, res->name, res->action);
 		break;
 	case CMD_CREATE:
 	case NONE:
@@ -336,6 +342,10 @@ vmmaction(struct parse_result *res)
 				break;
 			case CMD_UNPAUSE:
 				done = unpause_vm_complete(&imsg, &ret);
+				break;
+			case CMD_GETSTATS:
+				get_num_vm(&imsg, &ret);
+				done = 1;
 				break;
 			default:
 				done = 1;
@@ -1051,4 +1061,16 @@ ctl_openconsole(const char *name)
 	execl(VMCTL_CU, VMCTL_CU, "-r", "-l", name, "-s", "115200",
 	    (char *)NULL);
 	err(1, "failed to open the console");
+}
+
+int
+ctl_getStats(struct parse_result *res, int argc, char *argv[])
+{
+	if (argc == 2) {
+		if (parse_vmid(res, argv[1], 0) == -1)
+			errx(1, "invalid id: %s", argv[1]);
+	} else if (argc != 2)
+		ctl_usage(res->ctl);
+
+	return (vmmaction(res));
 }
