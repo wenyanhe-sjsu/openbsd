@@ -929,10 +929,7 @@ virtio_nused(struct virtqueue *vq)
 	return n;
 }
 
-<<<<<<< HEAD
-=======
 //#if VIRTIO_DEBUG
->>>>>>> 1d0a5d449d98b7fbf69dee0082184ffe81c3bd3a
 void
 virtio_vq_dump(struct virtqueue *vq)
 {
@@ -953,7 +950,4 @@ virtio_vq_dump(struct virtqueue *vq)
 	printf(" + used event: %d\n", VQ_USED_EVENT(vq));
 	printf(" +++++++++++++++++++++++++++\n");
 }
-<<<<<<< HEAD
-=======
 //#endif
->>>>>>> 1d0a5d449d98b7fbf69dee0082184ffe81c3bd3a

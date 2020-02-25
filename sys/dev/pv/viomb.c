@@ -95,7 +95,6 @@ struct uvmexp uvmexp, ouvmexp;
 #define VIRTIO_BALLOON_S_MEMTOT   5   /* Total amount of memory */
 #define VIRTIO_BALLOON_S_AVAIL    6   /* */
 #define VIRTIO_BALLOON_S_NR       7   /* */
-#define VIOMB_STATS_MAX		  1   /* Maximum number of tags */
 
 #define VIOMB_BUFSIZE 16
 
@@ -159,11 +158,6 @@ struct viomb_softc {
 	struct virtio_balloon_stat 	*sc_stats_buf;
 	int 						sc_stats_needs_update;
 };
-
-struct virtio_balloon_stat {
-	uint16_t tag;
-	uint64_t val;
-} __attribute__((packed));
 
 int	viomb_match(struct device *, void *, void *);
 void	viomb_attach(struct device *, struct device *, void *);
