@@ -535,9 +535,13 @@ initriscv(struct riscv_bootparams *rbp)
 	int (*map_func_save)(bus_space_tag_t, bus_addr_t, bus_size_t, int,
 	    bus_space_handle_t *);
 #endif  // 0
-	// NOTE: FDT is already mapped (rbp->dtbp_virt & rbp->dtbp_phys)
+
+	// NOTE: FDT is already mapped (rbp->dtbp_virt => rbp->dtbp_phys)
+	// Initialize the Flattened Device Tree
+	if (fdt)
+		fdt_init(fdt);
 	
-	// struct fdt_reg reg; // XXX not yet used
+	struct fdt_reg reg;
 	void *node;
 
 	node = fdt_find_node("/chosen");
@@ -614,8 +618,39 @@ initriscv(struct riscv_bootparams *rbp)
 	long kernbase = (long)&_start & ~0x00fff;//page aligned
 
 	/* The bootloader has loaded us into a 64MB block. */
-	memstart = KERNBASE + kvo;		//va + (pa - va) ==> pa
-	memend = memstart + 64 * 1024 * 1024;	//XXX CMPE: size also 64M??
+	// memstart = KERNBASE + kvo;		//va + (pa - va) ==> pa
+	// memend = memstart + 64 * 1024 * 1024;	//XXX CMPE: size also 64M??
+
+	node = fdt_find_node("/memory");
+	if (node == NULL)
+		panic("%s: no memory specified", __func__);
+
+	paddr_t start, end;
+	int i;
+
+	// Assume that the kernel was loaded at valid physical memory location
+	// Scan the FDT to identify the full physical address range for machine
+	// XXX Save physical memory segments to later allocate to UVM?
+	memstart = memend = kernbase + kvo;
+	for (i = 0; i < VM_PHYSSEG_MAX; i++) {
+		if (fdt_get_reg(node, i, &reg))
+			break;
+		if (reg.size == 0)
+			continue;
+
+		start = reg.addr;
+		end = reg.addr + reg.size;
+
+		if (start < memstart)
+			memstart = start;
+		if (end > memend)
+			memend = end;
+	}
+
+	// XXX At this point, OpenBSD/arm64 would have set memstart / memend
+	// to the range mapped by the bootloader (KERNBASE - KERNBASE + 64MiB).
+	// Instead, we have mapped memstart / memend to the full physical
+	// address range. What implications might this have?
 
 	/* Bootstrap enough of pmap to enter the kernel proper. */
 	vstart = pmap_bootstrap(kvo, rbp->kern_l1pt,
