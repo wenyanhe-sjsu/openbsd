@@ -130,6 +130,7 @@
     (va) < (dmap_max_addr))
 
 #define	PMAP_HAS_DMAP	1
+#if 0	// XXX KASSERT missing. Find a better way to enforce boundary.
 #define	PHYS_TO_DMAP(pa)						\
 ({									\
 	KASSERT(PHYS_IN_DMAP(pa),					\
@@ -137,7 +138,14 @@
 	    (vm_paddr_t)(pa)));						\
 	((pa) - dmap_phys_base) + DMAP_MIN_ADDRESS;			\
 })
+#else
+#define	PHYS_TO_DMAP(pa)						\
+({									\
+	((pa) - dmap_phys_base) + DMAP_MIN_ADDRESS;			\
+})
+#endif
 
+#if 0	// XXX KASSERT missing. Find a better way to enforce boundary.
 #define	DMAP_TO_PHYS(va)						\
 ({									\
 	KASSERT(VIRT_IN_DMAP(va),					\
@@ -145,6 +153,12 @@
 	    (vm_offset_t)(va)));					\
 	((va) - DMAP_MIN_ADDRESS) + dmap_phys_base;			\
 })
+#else
+#define	DMAP_TO_PHYS(va)						\
+({									\
+	((va) - DMAP_MIN_ADDRESS) + dmap_phys_base;			\
+})
+#endif
 
 #define	VM_MIN_USER_ADDRESS	(0x0000000000000000UL)
 #define	VM_MAX_USER_ADDRESS	(0x0000004000000000UL)  // 39 User Space Bits

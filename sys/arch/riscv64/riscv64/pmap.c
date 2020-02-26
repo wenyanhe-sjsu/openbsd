@@ -1324,7 +1324,7 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	ssize_t size;
 	for (mp = pmap_allocated; mp->size != 0; mp++) {
 		/* bounds may be kinda messed up */
-		for (pa = mp->start, size = mp->size & ~0xfff;
+		for (pa = mp->start, size = mp->size & ~(PAGE_SIZE-1);
 		    size > 0;
 		    pa+= L2_SIZE, size -= L2_SIZE)
 		{
@@ -1342,13 +1342,9 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 			    mapva < (vaddr_t)_erodata)
 				prot = PROT_READ;
 
-#if 0	// XXX Determine appropriate PTE
-			vp2->l2[VP_IDX2(mapva)] = mappa | L2_BLOCK |
-			    ATTR_IDX(PTE_ATTR_WB) |
-			    ATTR_nG | ap_bits_kern[prot];
-#else
-			vp2->l2[VP_IDX2(mapva)] = 0x0;
-#endif
+			// XXX What does ATTR_nG in arm64 mean?
+			vp2->l2[VP_IDX2(mapva)] = VP_Lx(mappa) |
+			    ap_bits_kern[prot] | PTE_V;
 		}
 	}
 
@@ -2181,7 +2177,14 @@ pmap_steal_avail(size_t size, int align, void **kva)
 				if (kva != NULL){
 					*kva = (void *)(start - pmap_avail_kvo);
 				}
-				bzero((void*)(start), size);
+				// XXX We clear the page based on its Direct
+				// Mapped address for now. Physical Addresses
+				// are not available because we have unmapped
+				// our identity mapped kernel. Should consider
+				// if we need to keep the identity mapping
+				// during pmap bootstrapping.
+				vaddr_t start_dmap = PHYS_TO_DMAP(start);
+				bzero((void*)(start_dmap), size);
 				return start;
 			}
 		}
