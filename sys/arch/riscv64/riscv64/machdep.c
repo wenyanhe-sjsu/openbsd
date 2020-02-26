@@ -540,7 +540,10 @@ initriscv(struct riscv_bootparams *rbp)
 	// Initialize the Flattened Device Tree
 	if (fdt)
 		fdt_init(fdt);
-	
+
+	size_t fdt_size = fdt_get_size(fdt);
+	paddr_t fdt_start = (paddr_t) rbp->dtbp_phys;
+	paddr_t fdt_end = fdt_start + fdt_size;
 	struct fdt_reg reg;
 	void *node;
 
@@ -615,11 +618,14 @@ initriscv(struct riscv_bootparams *rbp)
 	process_kernel_args();
 
 	void _start(void);
-	long kernbase = (long)&_start & ~0x00fff;//page aligned
+	long kernbase = (long)&_start & ~(PAGE_SIZE-1); // page aligned
 
+#if 0	// Below we set memstart / memend based on entire physical address
+	// range based on information sourced from FDT.
 	/* The bootloader has loaded us into a 64MB block. */
-	// memstart = KERNBASE + kvo;		//va + (pa - va) ==> pa
-	// memend = memstart + 64 * 1024 * 1024;	//XXX CMPE: size also 64M??
+	memstart = KERNBASE + kvo;		//va + (pa - va) ==> pa
+	memend = memstart + 64 * 1024 * 1024;	//XXX CMPE: size also 64M??
+#endif
 
 	node = fdt_find_node("/memory");
 	if (node == NULL)
@@ -654,7 +660,7 @@ initriscv(struct riscv_bootparams *rbp)
 
 	/* Bootstrap enough of pmap to enter the kernel proper. */
 	vstart = pmap_bootstrap(kvo, rbp->kern_l1pt,
-	    kernbase, esym, memstart, memend);
+	    kernbase, esym, fdt_start, fdt_end, memstart, memend);
 
 	// XX correctly sized?
 	proc0paddr = (struct user *)rbp->kern_stack;

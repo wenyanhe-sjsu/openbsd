@@ -1176,7 +1176,7 @@ pmap_bootstrap_dmap(vaddr_t kern_l1, paddr_t min_pa, paddr_t max_pa)
 	    pa += L1_SIZE, va += L1_SIZE, l1_slot++) {
 		KASSERT(l1_slot < Ln_ENTRIES);
 
-		/* superpages */
+		/* gigapages */
 		pn = (pa / PAGE_SIZE);
 		entry = PTE_KERN;
 		entry |= (pn << PTE_PPN0_S);
@@ -1191,8 +1191,8 @@ pmap_bootstrap_dmap(vaddr_t kern_l1, paddr_t min_pa, paddr_t max_pa)
 }
 
 vaddr_t
-pmap_bootstrap(long kvo, vaddr_t l1pt, long kernelstart, long kernelend,
-    long ram_start, long ram_end)
+pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
+    paddr_t fdt_start, paddr_t fdt_end, paddr_t ram_start, paddr_t ram_end)
 {
 	void  *va;
 	paddr_t pa, pt1pa;
@@ -1218,6 +1218,10 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, long kernelstart, long kernelend,
 	// XXX Console not initialized yet. Uncomment when printf works.
 	// printf("removing %lx-%lx\n", kernelstart+kvo, kernelend+kvo);
 	pmap_remove_avail(kernelstart+kvo, kernelend+kvo);
+	// Remove the FDT physical address range as well
+	// XXX Console not initialized yet. Uncomment when printf works.
+	// printf("removing %lx-%lx\n", fdt_start+kvo, fdt_end+kvo);
+	pmap_remove_avail(fdt_start, fdt_end);
 
 	/*
 	 * KERNEL IS ASSUMED TO BE 39 bits (or less), start from L1,
@@ -1225,6 +1229,8 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, long kernelstart, long kernelend,
 	 * bootstrap so all accesses initializing tables must be done
 	 * via physical pointers
 	 */
+
+	// Map the entire Physical Address Space to Direct Mapped Region
 	pmap_bootstrap_dmap(l1pt, ram_start, ram_end);
 
 	pt1pa = pmap_steal_avail(2 * sizeof(struct pmapvp1), Lx_TABLE_ALIGN,

@@ -93,8 +93,10 @@ extern struct pmap kernel_pmap_;
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
 
-vaddr_t pmap_bootstrap(long kvo, paddr_t lpt1,  long kernelstart,
-    long kernelend, long ram_start, long ram_end);
+vaddr_t pmap_bootstrap(long kvo, paddr_t lpt1,
+		vaddr_t kernelstart, vaddr_t kernelend,
+		paddr_t fdt_start, paddr_t fdt_end,
+		paddr_t ram_start, paddr_t ram_end);
 void pmap_kenter_cache(vaddr_t va, paddr_t pa, vm_prot_t prot, int cacheable);
 void pmap_page_ro(pmap_t pm, vaddr_t va, vm_prot_t prot);
 
