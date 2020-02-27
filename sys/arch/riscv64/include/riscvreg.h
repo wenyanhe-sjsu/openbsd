@@ -152,9 +152,10 @@
 #define UIP_UTIP	(1 << 4)
 #define UIP_UEIP	(1 << 8)
 
+#define PPN(pa)		(((uint64_t) pa) >> PAGE_SHIFT)
 #define SATP_PPN_SHIFT		0
 #define SATP_PPN_MASK		(0xfffffffffffULL << SATP_PPN_SHIFT)
-#define SATP_PPN(ppn)		((((uint64_t) ppn) << SATP_PPN_SHIFT) & SATP_PPN_MASK)
+#define SATP_PPN(pa)		((PPN(pa) << SATP_PPN_SHIFT) & SATP_PPN_MASK)
 #define SATP_ASID_SHIFT		44
 #define SATP_ASID_MASK		(0xffffULL << SATP_ASID_SHIFT)
 #define SATP_ASID(asid)		((((uint64_t) asid) << SATP_ASID_SHIFT) & SATP_ASID_MASK)

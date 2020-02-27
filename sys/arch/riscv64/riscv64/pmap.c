@@ -978,7 +978,12 @@ VP_Lx(paddr_t pa)
 	 * This function takes the pa address given and manipulates it
 	 * into the form that should be inserted into the VM table.
 	 */
-	return (pa >> PAGE_SHIFT) << PTE_PPN0_S;
+	// NOTE: We always assume the entry is valid. OpenBSD/arm64 uses
+	// the least significant bits to differentiate between PTD / PTE.
+	// In riscv64 Sv39 address translation mode PTD / PTE distinguished
+	// by the lack of PTE_R / PTE_X on an entry with PTE_V set. For both
+	// a PTD and PTE, the PTE_V bit is set.
+	return (((pa & PTE_RPGN) >> PAGE_SHIFT) << PTE_PPN0_S) | PTE_V;
 }
 
 /*
@@ -1214,10 +1219,10 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	 */
 	printf("removing %lx-%lx\n", ram_start, kernelstart+kvo);
 	pmap_remove_avail(ram_start, kernelstart+kvo);
-	
+
 	printf("removing %lx-%lx\n", kernelstart+kvo, kernelend+kvo);
 	pmap_remove_avail(kernelstart+kvo, kernelend+kvo);
-	
+
 	// Remove the FDT physical address range as well
 	printf("removing %lx-%lx\n", fdt_start+kvo, fdt_end+kvo);
 	pmap_remove_avail(fdt_start, fdt_end);
@@ -1234,7 +1239,7 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 
 	pt1pa = pmap_steal_avail(2 * sizeof(struct pmapvp1), Lx_TABLE_ALIGN,
 	    &va);
-	vp1 = (struct pmapvp1 *)pt1pa;
+	vp1 = (struct pmapvp1 *) PHYS_TO_DMAP(pt1pa);
 	pmap_kernel()->pm_vp.l1 = (struct pmapvp1 *)va;
 	pmap_kernel()->pm_privileged = 1;
 	pmap_kernel()->pm_asid = 0;
@@ -1250,7 +1255,7 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 		mappings_allocated++;
 		pa = pmap_steal_avail(sizeof(struct pmapvp2), Lx_TABLE_ALIGN,
 		    &va);
-		vp2 = (struct pmapvp2 *)pa; /* indexed physically */
+		vp2 = (struct pmapvp2 *) PHYS_TO_DMAP(pa);
 		vp1->vp[i] = va;
 		vp1->l1[i] = VP_Lx(pa);
 
@@ -1268,10 +1273,9 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 			mappings_allocated++;
 			pa = pmap_steal_avail(sizeof(struct pmapvp3),
 			    Lx_TABLE_ALIGN, &va);
-			vp3 = (struct pmapvp3 *)pa; /* indexed physically */
+			vp3 = (struct pmapvp3 *) PHYS_TO_DMAP(pa);
 			vp2->vp[j] = va;
 			vp2->l2[j] = VP_Lx(pa);
-
 		}
 	}
 	/* allocate Lx entries */
@@ -1279,7 +1283,7 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	    i <= VP_IDX1(pmap_maxkvaddr - 1);
 	    i++) {
 		/* access must be performed physical */
-		vp2 = (void *)((long)vp1->vp[i] + kvo);
+		vp2 = (void *) PHYS_TO_DMAP((long)vp1->vp[i] + kvo);
 
 		if (i == VP_IDX1(VM_MIN_KERNEL_ADDRESS)) {
 			lb_idx2 = VP_IDX2(VM_MIN_KERNEL_ADDRESS);
@@ -1293,7 +1297,7 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 		}
 		for (j = lb_idx2; j <= ub_idx2; j++) {
 			/* access must be performed physical */
-			vp3 = (void *)((long)vp2->vp[j] + kvo);
+			vp3 = (void *) PHYS_TO_DMAP((long)vp2->vp[j] + kvo);
 
 			for (k = 0; k <= VP_IDX3_CNT - 1; k++) {
 				pted_allocated++;
@@ -1306,19 +1310,20 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	}
 
 	pa = pmap_steal_avail(Lx_TABLE_ALIGN, Lx_TABLE_ALIGN, &va);
-	memset((void *)pa, 0, Lx_TABLE_ALIGN);
+	memset((void *) PHYS_TO_DMAP(pa), 0, Lx_TABLE_ALIGN);
 	pmap_kernel()->pm_pt0pa = pa;
 
 	/* now that we have mapping space for everything, lets map it */
 	/* all of these mappings are ram -> kernel va */
 
+#if 0	// XXX This block does not appear to do anything useful?
 	/*
 	 * enable mappings for existing 'allocated' mapping in the bootstrap
 	 * page tables
 	 */
 	extern uint64_t *pagetable_l2;
 	extern char _end[];
-	vp2 = (void *)((long)&pagetable_l2 + kvo);
+	vp2 = (void *) PHYS_TO_DMAP((long)&pagetable_l2 + kvo);
 	struct mem_region *mp;
 	ssize_t size;
 	for (mp = pmap_allocated; mp->size != 0; mp++) {
@@ -1343,9 +1348,10 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 
 			// XXX What does ATTR_nG in arm64 mean?
 			vp2->l2[VP_IDX2(mapva)] = VP_Lx(mappa) |
-			    ap_bits_kern[prot] | PTE_V;
+			    ap_bits_kern[prot];
 		}
 	}
+#endif
 
 	pmap_avail_fixup();
 
@@ -1358,11 +1364,17 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	 */
 	vstart = pmap_map_stolen(kernelstart);
 
+	// Include the Direct Map in Kernel PMAP
+	pmap_bootstrap_dmap((vaddr_t) pmap_kernel()->pm_vp.l1, ram_start, ram_end);
+
 #if 0	// XXX ???
 	void (switch_mmu_kernel)(long);
 	void (*switch_mmu_kernel_table)(long) =
 	    (void *)((long)&switch_mmu_kernel + kvo);
 	switch_mmu_kernel_table(pt1pa);
+#else
+	uint64_t satp = SATP_MODE(0x8) | SATP_ASID(0) | SATP_PPN(pt1pa);
+	__asm __volatile("csrw satp, %0" :: "r" (satp) : "memory");
 #endif
 
 	printf("all mapped\n");
@@ -1701,9 +1713,9 @@ pmap_pte_insert(struct pte_desc *pted)
 void
 pmap_pte_update(struct pte_desc *pted, uint64_t *pl3)
 {
-#if 0	// XXX TODO
 	uint64_t pte, access_bits;
 	pmap_t pm = pted->pted_pmap;
+#if 0	// XXX Attributes specific to arm64? Does riscv64 have equivalent?
 	uint64_t attr = ATTR_nG;
 
 	/* see mair in locore.S */
@@ -1729,15 +1741,15 @@ pmap_pte_update(struct pte_desc *pted, uint64_t *pl3)
 	default:
 		panic("pmap_pte_insert: invalid cache mode");
 	}
+#endif
 
 	if (pm->pm_privileged)
 		access_bits = ap_bits_kern[pted->pted_pte & PROT_MASK];
 	else
 		access_bits = ap_bits_user[pted->pted_pte & PROT_MASK];
 
-	pte = (pted->pted_pte & PTE_RPGN) | attr | access_bits | L3_P;
+	pte = VP_Lx(pted->pted_pte) | access_bits;
 	*pl3 = pte;
-#endif
 }
 
 void
