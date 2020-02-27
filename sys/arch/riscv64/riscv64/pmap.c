@@ -1364,8 +1364,10 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	 */
 	vstart = pmap_map_stolen(kernelstart);
 
+#if 0	// Not safe? Kernel pages not yet allocated for DMAP
 	// Include the Direct Map in Kernel PMAP
 	pmap_bootstrap_dmap((vaddr_t) pmap_kernel()->pm_vp.l1, ram_start, ram_end);
+#endif
 
 #if 0	// XXX ???
 	void (switch_mmu_kernel)(long);

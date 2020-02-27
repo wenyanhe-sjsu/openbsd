@@ -546,7 +546,7 @@ initriscv(struct riscv_bootparams *rbp)
 
 	// Initialize the Flattened Device Tree
 	if (!fdt_init(config) || fdt_get_size(config) == 0)
-		panic("initarm: no FDT");
+		panic("initriscv: no FDT");
 
 	// pmap_map_early((paddr_t)config, round_page(fdt_get_size(config)));
 
@@ -685,15 +685,16 @@ initriscv(struct riscv_bootparams *rbp)
 	copy_dst_page = vstart;
 	vstart += MAXCPUS * PAGE_SIZE;
 
-#if 0	// XXX FDT already mapped to safe memory?
+#if 0	// XXX Not sure this is safe yet.
 	/* Relocate the FDT to safe memory. */
-	if (fdt_get_size(config) != 0) {
-		uint32_t csize, size = round_page(fdt_get_size(config));
+	if (fdt_size != 0) {
+		uint32_t csize, size = round_page(fdt_size);
 		paddr_t pa;
 		vaddr_t va;
 
 		pa = pmap_steal_avail(size, PAGE_SIZE, NULL);
-		memcpy((void *)pa, config, size); /* copy to physical */
+		memcpy((void *) PHYS_TO_DMAP(pa),
+		       (void *) PHYS_TO_DMAP(fdt_start), size);
 		for (va = vstart, csize = size; csize > 0;
 		    csize -= PAGE_SIZE, va += PAGE_SIZE, pa += PAGE_SIZE)
 			pmap_kenter_cache(va, pa, PROT_READ, PMAP_CACHE_WB);
@@ -741,9 +742,11 @@ initriscv(struct riscv_bootparams *rbp)
 	virtual_end = vend;
 	}
 
+#if 0	// XXX Need to map the FDT into virtual address space first.
 	/* Now we can reinit the FDT, using the virtual address. */
 	if (fdt)
 		fdt_init(fdt);
+#endif
 
 	// XXX
 	int pmap_bootstrap_bs_map(bus_space_tag_t t, bus_addr_t bpa,
