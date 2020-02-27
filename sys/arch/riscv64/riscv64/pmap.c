@@ -1212,15 +1212,14 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	 * bootstrap vm table, which we may need to preserve until
 	 * later.
 	 */
-	// XXX Console not initialized yet. Uncomment when printf works.
 	printf("removing %lx-%lx\n", ram_start, kernelstart+kvo);
 	pmap_remove_avail(ram_start, kernelstart+kvo);
-	// XXX Console not initialized yet. Uncomment when printf works.
-	// printf("removing %lx-%lx\n", kernelstart+kvo, kernelend+kvo);
+	
+	printf("removing %lx-%lx\n", kernelstart+kvo, kernelend+kvo);
 	pmap_remove_avail(kernelstart+kvo, kernelend+kvo);
+	
 	// Remove the FDT physical address range as well
-	// XXX Console not initialized yet. Uncomment when printf works.
-	// printf("removing %lx-%lx\n", fdt_start+kvo, fdt_end+kvo);
+	printf("removing %lx-%lx\n", fdt_start+kvo, fdt_end+kvo);
 	pmap_remove_avail(fdt_start, fdt_end);
 
 	/*

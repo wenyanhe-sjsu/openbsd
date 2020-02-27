@@ -529,19 +529,28 @@ initriscv(struct riscv_bootparams *rbp)
 	struct cpu_info *pcpup;
 	long kvo = rbp->kern_delta;	//should be PA - VA 
 	paddr_t memstart, memend;
-	void *fdt = (void *) rbp->dtbp_virt; // XXX Cast?
-#if 0
-	// XXX What?
+
+	void *config = (void *) rbp->dtbp_virt;
+	void *fdt = NULL; //(void *) rbp->dtbp_virt; // XXX Cast?
+
+	// EFI_PHYSICAL_ADDRESS system_table = 0;
 	int (*map_func_save)(bus_space_tag_t, bus_addr_t, bus_size_t, int,
 	    bus_space_handle_t *);
-#endif  // 0
 
-	// NOTE: FDT is already mapped (rbp->dtbp_virt => rbp->dtbp_phys)
+	// NOTE that 1GB of ram is mapped in by default in
+	// the bootstrap memory config, so nothing is necessary
+	// until pmap_bootstrap_finalize is called??
+
+	//XXX NOTE: FDT is already mapped (rbp->dtbp_virt => rbp->dtbp_phys)
+	// pmap_map_early((paddr_t)config, PAGE_SIZE);
+
 	// Initialize the Flattened Device Tree
-	if (fdt)
-		fdt_init(fdt);
+	if (!fdt_init(config) || fdt_get_size(config) == 0)
+		panic("initarm: no FDT");
 
-	size_t fdt_size = fdt_get_size(fdt);
+	// pmap_map_early((paddr_t)config, round_page(fdt_get_size(config)));
+
+	size_t fdt_size = fdt_get_size(config);
 	paddr_t fdt_start = (paddr_t) rbp->dtbp_phys;
 	paddr_t fdt_end = fdt_start + fdt_size;
 	struct fdt_reg reg;
@@ -735,20 +744,20 @@ initriscv(struct riscv_bootparams *rbp)
 	/* Now we can reinit the FDT, using the virtual address. */
 	if (fdt)
 		fdt_init(fdt);
-#if 0
 
 	// XXX
 	int pmap_bootstrap_bs_map(bus_space_tag_t t, bus_addr_t bpa,
 	    bus_size_t size, int flags, bus_space_handle_t *bshp);
 
-	map_func_save = arm64_bs_tag._space_map;
-	arm64_bs_tag._space_map = pmap_bootstrap_bs_map;
+	map_func_save = riscv64_bs_tag._space_map;
+	riscv64_bs_tag._space_map = pmap_bootstrap_bs_map;
 
 	// cninit
 	consinit();
 
-	arm64_bs_tag._space_map = map_func_save;
+	riscv64_bs_tag._space_map = map_func_save;
 
+#if 0
 	/* Remap EFI runtime. */
 	if (mmap_start != 0 && system_table != 0)
 		remap_efi_runtime(system_table);
@@ -921,3 +930,37 @@ process_kernel_args(void)
 		boothowto |= fl;
 	}
 }
+
+/*
+ * allow bootstrap to steal KVA after machdep has given it back to pmap.
+ * XXX - need a mechanism to prevent this from being used too early or late.
+ */
+int
+pmap_bootstrap_bs_map(bus_space_tag_t t, bus_addr_t bpa, bus_size_t size,
+    int flags, bus_space_handle_t *bshp)
+{
+	u_long startpa, pa, endpa;
+	vaddr_t va;
+
+	extern vaddr_t virtual_avail, virtual_end;
+
+	va = virtual_avail; // steal memory from virtual avail.
+
+	if (va == 0)
+		panic("pmap_bootstrap_bs_map, no virtual avail");
+
+	startpa = trunc_page(bpa);
+	endpa = round_page((bpa + size));
+
+	*bshp = (bus_space_handle_t)(va + (bpa - startpa));
+
+	for (pa = startpa; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE)
+		pmap_kenter_cache(va, pa, PROT_READ | PROT_WRITE,
+		    PMAP_CACHE_DEV);
+
+	virtual_avail = va;
+
+	return 0;
+}
+
+

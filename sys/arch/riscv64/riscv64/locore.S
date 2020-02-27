@@ -216,9 +216,11 @@ va:					//XXX just a trampoline?
 	lla	gp, __global_pointer$
 .option pop
 
+	// maybe not the right time to say goodbye ?
 	/* Unmap the identity mapped kernel gigapage */
-	sd	x0, (s8)	// s8 is addr of pte for identity mapped kernel
-	sfence.vma		// Flush the TLB. Goodbye identity mapped kernel!
+	// sd	x0, (s8)	// s8 is addr of pte for identity mapped kernel
+	// sfence.vma		// Flush the TLB. Goodbye identity mapped kernel!
+
 
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler	//-->where the real setup happens
