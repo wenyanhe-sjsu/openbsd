@@ -564,8 +564,6 @@ riscv_dflt_splraise(int newcpl)
 int
 riscv_dflt_spllower(int newcpl)
 {
-	panic("riscv_dflt_spllower() called");
-#if 0
 	struct cpu_info *ci = curcpu();
 	int oldcpl;
 
@@ -574,8 +572,6 @@ riscv_dflt_spllower(int newcpl)
 	splx(newcpl);
 
 	return oldcpl;
-#endif
-	return newcpl;
 }
 
 void
@@ -591,12 +587,9 @@ riscv_dflt_splx(int newcpl)
 void
 riscv_dflt_setipl(int newcpl)
 {
-	panic("riscv_dflt_setipl() called");
-#if 0
 	struct cpu_info *ci = curcpu();
 
 	ci->ci_cpl = newcpl;
-#endif
 }
 
 void
@@ -697,8 +690,6 @@ splx(int ipl)
 void
 riscv_splassert_check(int wantipl, const char *func)
 {
-	panic("riscv_splassert_check() called");
-#if 0
 	int oldipl = curcpu()->ci_cpl;
 
 	if (oldipl < wantipl) {
@@ -713,7 +704,6 @@ riscv_splassert_check(int wantipl, const char *func)
 	if (wantipl == IPL_NONE && curcpu()->ci_idepth != 0) {
 		splassert_fail(-1, curcpu()->ci_idepth, func);
 	}
-#endif
 }
 #endif
 
