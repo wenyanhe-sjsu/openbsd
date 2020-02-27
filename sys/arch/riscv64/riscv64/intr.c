@@ -548,8 +548,6 @@ riscv_intr_cpu_enable(void)
 int
 riscv_dflt_splraise(int newcpl)
 {
-	panic("riscv_dflt_splraise() called");
-#if 0
 	struct cpu_info *ci = curcpu();
 	int oldcpl;
 
@@ -561,8 +559,6 @@ riscv_dflt_splraise(int newcpl)
 	ci->ci_cpl = newcpl;
 
 	return oldcpl;
-#endif
-	return newcpl;
 }
 
 int
@@ -585,14 +581,11 @@ riscv_dflt_spllower(int newcpl)
 void
 riscv_dflt_splx(int newcpl)
 {
-	panic("riscv_dflt_splx() called");
-#if 0
 	struct cpu_info *ci = curcpu();
 
 	if (ci->ci_ipending & riscv_smask[newcpl])
 		riscv_do_pending_intr(newcpl);
 	ci->ci_cpl = newcpl;
-#endif
 }
 
 void

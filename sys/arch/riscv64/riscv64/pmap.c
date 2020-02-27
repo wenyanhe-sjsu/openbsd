@@ -1213,7 +1213,7 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	 * later.
 	 */
 	// XXX Console not initialized yet. Uncomment when printf works.
-	// printf("removing %lx-%lx\n", ram_start, kernelstart+kvo);
+	printf("removing %lx-%lx\n", ram_start, kernelstart+kvo);
 	pmap_remove_avail(ram_start, kernelstart+kvo);
 	// XXX Console not initialized yet. Uncomment when printf works.
 	// printf("removing %lx-%lx\n", kernelstart+kvo, kernelend+kvo);
