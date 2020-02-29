@@ -193,9 +193,7 @@ consinit(void)
 #endif
 	com_fdt_init_cons();
 
-#if 0 // XXX: CMPE, necessary?
 	simplefb_init_cons(&riscv64_bs_tag);
-#endif
 }
 
 
@@ -713,11 +711,9 @@ initriscv(struct riscv_bootparams *rbp)
 	virtual_end = vend;
 	}
 
-#if 0	// XXX Need to map the FDT into virtual address space first.
 	/* Now we can reinit the FDT, using the virtual address. */
 	if (fdt)
 		fdt_init(fdt);
-#endif
 
 	// XXX
 	int pmap_bootstrap_bs_map(bus_space_tag_t t, bus_addr_t bpa,
@@ -731,11 +727,6 @@ initriscv(struct riscv_bootparams *rbp)
 
 	riscv64_bs_tag._space_map = map_func_save;
 
-#if 0
-	/* Remap EFI runtime. */
-	if (mmap_start != 0 && system_table != 0)
-		remap_efi_runtime(system_table);
-
 	/* XXX */
 	pmap_avail_fixup();
 
@@ -745,6 +736,7 @@ initriscv(struct riscv_bootparams *rbp)
 	/* Make what's left of the initial 64MB block available to UVM. */
 	pmap_physload_avail();
 
+#if 0
 	/* Make all other physical memory available to UVM. */
 	if (mmap && mmap_desc_ver == EFI_MEMORY_DESCRIPTOR_VERSION) {
 		EFI_MEMORY_DESCRIPTOR *desc = mmap;
@@ -814,7 +806,7 @@ initriscv(struct riscv_bootparams *rbp)
 			}
 		}
 	}
-
+#endif
 	/*
 	 * Make sure that we have enough KVA to initialize UVM.  In
 	 * particular, we need enough KVA to be able to allocate the
@@ -822,7 +814,7 @@ initriscv(struct riscv_bootparams *rbp)
 	 */
 	pmap_growkernel(VM_MIN_KERNEL_ADDRESS + 1024 * 1024 * 1024 +
 	    physmem * sizeof(struct vm_page));
-
+#if 0
 #ifdef DDB
 	db_machine_init();
 
@@ -832,10 +824,9 @@ initriscv(struct riscv_bootparams *rbp)
 	if (boothowto & RB_KDB)
 		db_enter();
 #endif
-
+#endif
 	softintr_init();
 	splraise(IPL_IPI);
-#endif
 }
 
 char bootargs[256];
