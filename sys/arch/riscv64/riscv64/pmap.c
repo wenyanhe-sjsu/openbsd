@@ -617,7 +617,7 @@ pmap_remove_pted(pmap_t pm, struct pte_desc *pted)
 
 
 /*
- * Enter a kernel mapping for the given page.
+ * Populate a kernel mapping for the given page.
  * kernel mappings have a larger set of prerequisites than normal mappings.
  *
  * 1. no memory should be allocated to create a kernel mapping.
@@ -1282,7 +1282,6 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	for (i = VP_IDX1(VM_MIN_KERNEL_ADDRESS);
 	    i <= VP_IDX1(pmap_maxkvaddr - 1);
 	    i++) {
-		/* access must be performed physical */
 		vp2 = (void *) PHYS_TO_DMAP((long)vp1->vp[i] + kvo);
 
 		if (i == VP_IDX1(VM_MIN_KERNEL_ADDRESS)) {
@@ -1296,7 +1295,6 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 			ub_idx2 = VP_IDX2_CNT - 1;
 		}
 		for (j = lb_idx2; j <= ub_idx2; j++) {
-			/* access must be performed physical */
 			vp3 = (void *) PHYS_TO_DMAP((long)vp2->vp[j] + kvo);
 
 			for (k = 0; k <= VP_IDX3_CNT - 1; k++) {
@@ -1359,25 +1357,17 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	 * At this point we are still running on the bootstrap page
 	 * tables however all memory for the final page tables is
 	 * 'allocated' and should now be mapped.  This means we are
-	 * able to use the virtual addressing to enter the final
+	 * able to use the virtual addressing to populate the final
 	 * mappings into the new mapping tables.
 	 */
 	vstart = pmap_map_stolen(kernelstart);
 
-#if 0	// Not safe? Kernel pages not yet allocated for DMAP
 	// Include the Direct Map in Kernel PMAP
 	pmap_bootstrap_dmap((vaddr_t) pmap_kernel()->pm_vp.l1, ram_start, ram_end);
-#endif
 
-#if 0	// XXX ???
-	void (switch_mmu_kernel)(long);
-	void (*switch_mmu_kernel_table)(long) =
-	    (void *)((long)&switch_mmu_kernel + kvo);
-	switch_mmu_kernel_table(pt1pa);
-#else
+	//switching to new page table
 	uint64_t satp = SATP_MODE(0x8) | SATP_ASID(0) | SATP_PPN(pt1pa);
 	__asm __volatile("csrw satp, %0" :: "r" (satp) : "memory");
-#endif
 
 	printf("all mapped\n");
 
@@ -2185,7 +2175,7 @@ pmap_steal_avail(size_t size, int align, void **kva)
 		if (mp->size > size) {
 			start = (mp->start + (align -1)) & ~(align -1);
 			remsize = mp->size - (start - mp->start);
-			if (remsize >= 0) {
+			if (remsize >= 0) {//XXX buggy?? should be remsize >= size
 				pmap_remove_avail(start, start+size);
 				if (kva != NULL){
 					*kva = (void *)(start - pmap_avail_kvo);

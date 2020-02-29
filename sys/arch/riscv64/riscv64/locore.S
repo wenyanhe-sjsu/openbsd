@@ -271,6 +271,7 @@ va:					//XXX just a trampoline?
 	call	_C_LABEL(initriscv)	// Off we go, defined in machdep.c
 	call	_C_LABEL(main)		//defined in openbsd/kern/init_main.c
 
+	.data//XXX otherwise would fall into text region
 	.align  4
 initstack:
 	.space  (PAGE_SIZE * KSTACK_PAGES)
@@ -285,6 +286,7 @@ sigfillsiz:
 	.data
 	.quad	esigfill - sigfill
 
+	.text//XXX right place to restart text
 ENTRY(sigcode)
        mv      a0, sp
        addi    a0, a0, SF_SC //actual saved context

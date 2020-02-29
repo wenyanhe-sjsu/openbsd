@@ -533,7 +533,6 @@ initriscv(struct riscv_bootparams *rbp)
 	void *config = (void *) rbp->dtbp_virt;
 	void *fdt = NULL; //(void *) rbp->dtbp_virt; // XXX Cast?
 
-	// EFI_PHYSICAL_ADDRESS system_table = 0;
 	int (*map_func_save)(bus_space_tag_t, bus_addr_t, bus_size_t, int,
 	    bus_space_handle_t *);
 
@@ -685,7 +684,6 @@ initriscv(struct riscv_bootparams *rbp)
 	copy_dst_page = vstart;
 	vstart += MAXCPUS * PAGE_SIZE;
 
-#if 0	// XXX Not sure this is safe yet.
 	/* Relocate the FDT to safe memory. */
 	if (fdt_size != 0) {
 		uint32_t csize, size = round_page(fdt_size);
@@ -702,33 +700,6 @@ initriscv(struct riscv_bootparams *rbp)
 		fdt = (void *)vstart;
 		vstart += size;
 	}
-#endif
-
-#if 0	// XXX No EFI?
-	/* Relocate the EFI memory map too. */
-	if (mmap_start != 0) {
-		uint32_t csize, size = round_page(mmap_size);
-		paddr_t pa, startpa, endpa;
-		vaddr_t va;
-
-		startpa = trunc_page(mmap_start);
-		endpa = round_page(mmap_start + mmap_size);
-		for (pa = startpa, va = vstart; pa < endpa;
-		    pa += PAGE_SIZE, va += PAGE_SIZE)
-			pmap_kenter_cache(va, pa, PROT_READ, PMAP_CACHE_WB);
-		pa = pmap_steal_avail(size, PAGE_SIZE, NULL);
-		memcpy((void *)pa, (caddr_t)vstart + (mmap_start - startpa),
-		    mmap_size); /* copy to physical */
-		pmap_kremove(vstart, endpa - startpa);
-
-		for (va = vstart, csize = size; csize > 0;
-		    csize -= PAGE_SIZE, va += PAGE_SIZE, pa += PAGE_SIZE)
-			pmap_kenter_cache(va, pa, PROT_READ | PROT_WRITE, PMAP_CACHE_WB);
-
-		mmap = (void *)vstart;
-		vstart += size;
-	}
-#endif
 
 	/*
 	 * Managed KVM space is what we have claimed up to end of
