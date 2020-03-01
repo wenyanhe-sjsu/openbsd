@@ -56,7 +56,7 @@ const struct cfattach mainbus_ca = {
 	config_activate_children
 };
 
-const struct cfdriver mainbus_cd = {
+struct cfdriver mainbus_cd = {
 	NULL, "mainbus", DV_DULL
 };
 
