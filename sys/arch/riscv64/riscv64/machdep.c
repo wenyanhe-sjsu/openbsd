@@ -187,13 +187,13 @@ consinit(void)
 	consinit_called = 1;
 #if 0 //no support
 	amluart_init_cons();
+	com_fdt_init_cons();
 	imxuart_init_cons();
 	mvuart_init_cons();
 	pluart_init_cons();
+	simplefb_init_cons(&riscv64_bs_tag);
 #endif
 	com_fdt_init_cons();
-
-	simplefb_init_cons(&riscv64_bs_tag);
 }
 
 
@@ -529,7 +529,7 @@ initriscv(struct riscv_bootparams *rbp)
 	paddr_t memstart, memend;
 
 	void *config = (void *) rbp->dtbp_virt;
-	void *fdt = NULL; //(void *) rbp->dtbp_virt; // XXX Cast?
+	void *fdt = NULL;
 
 	int (*map_func_save)(bus_space_tag_t, bus_addr_t, bus_size_t, int,
 	    bus_space_handle_t *);
@@ -673,6 +673,8 @@ initriscv(struct riscv_bootparams *rbp)
 
 	msgbufaddr = (caddr_t)vstart;
 	msgbufphys = pmap_steal_avail(round_page(MSGBUFSIZE), PAGE_SIZE, NULL);
+	// XXX should map this msgbuffphys to kernel pmap??
+
 	vstart += round_page(MSGBUFSIZE);
 
 	zero_page = vstart;
@@ -715,7 +717,6 @@ initriscv(struct riscv_bootparams *rbp)
 	if (fdt)
 		fdt_init(fdt);
 
-	// XXX
 	int pmap_bootstrap_bs_map(bus_space_tag_t t, bus_addr_t bpa,
 	    bus_size_t size, int flags, bus_space_handle_t *bshp);
 

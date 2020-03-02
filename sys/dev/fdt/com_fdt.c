@@ -58,6 +58,7 @@ com_fdt_init_cons(void)
 	    (node = fdt_find_cons("snps,dw-apb-uart")) == NULL &&
 	    (node = fdt_find_cons("marvell,armada-38x-uart")) == NULL &&
 	    (node = fdt_find_cons("ti,omap3-uart")) == NULL &&
+	    (node = fdt_find_cons("ns16550a")) == NULL &&
 	    (node = fdt_find_cons("ti,omap4-uart")) == NULL)
 			return;
 	if (fdt_get_reg(node, 0, &reg))
