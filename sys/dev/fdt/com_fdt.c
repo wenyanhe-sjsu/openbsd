@@ -72,8 +72,8 @@ com_fdt_init_cons(void)
 	 * comcnattach() does by doing the minimal setup here.
 	 */
 
-	comcons_reg_width = OF_getpropint(stdout_node, "reg-io-width", 4);
-	comcons_reg_shift = OF_getpropint(stdout_node, "reg-shift", 2);
+	comcons_reg_width = OF_getpropint(stdout_node, "reg-io-width", 0);
+	comcons_reg_shift = OF_getpropint(stdout_node, "reg-shift", 0);
 
 	comconsiot = fdt_cons_bs_tag;
 	if (bus_space_map(comconsiot, reg.addr, reg.size, 0, &comconsioh))
