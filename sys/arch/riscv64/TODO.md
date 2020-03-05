@@ -36,3 +36,14 @@ child_return logic is best-guess. Consider re-evaluting at later point in time
 
 pmap's pm_mode is not yet set -- this will definitely cause issues
 should we consolidate pm_mode / pm_asid / pm_ppn into pm_satp?
+
+# Work Items
+* CPU Exception Handler (trap.c)
+    * Interrupts (Supervisor & User)
+    * Exceptions (Supervisor & User)
+* Periodic Clock (clock.c)
+    * cpu\_initclocks()
+    * cpu\_startclock()
+    * setstatclockrate()
+* Autoconf
+    * CPU Attachment 
