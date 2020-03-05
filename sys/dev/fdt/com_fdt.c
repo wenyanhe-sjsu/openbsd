@@ -58,6 +58,7 @@ com_fdt_init_cons(void)
 	    (node = fdt_find_cons("snps,dw-apb-uart")) == NULL &&
 	    (node = fdt_find_cons("marvell,armada-38x-uart")) == NULL &&
 	    (node = fdt_find_cons("ti,omap3-uart")) == NULL &&
+	    (node = fdt_find_cons("ns16550a")) == NULL &&
 	    (node = fdt_find_cons("ti,omap4-uart")) == NULL)
 			return;
 	if (fdt_get_reg(node, 0, &reg))
@@ -71,8 +72,8 @@ com_fdt_init_cons(void)
 	 * comcnattach() does by doing the minimal setup here.
 	 */
 
-	comcons_reg_width = OF_getpropint(stdout_node, "reg-io-width", 4);
-	comcons_reg_shift = OF_getpropint(stdout_node, "reg-shift", 2);
+	comcons_reg_width = OF_getpropint(stdout_node, "reg-io-width", 0);
+	comcons_reg_shift = OF_getpropint(stdout_node, "reg-shift", 0);
 
 	comconsiot = fdt_cons_bs_tag;
 	if (bus_space_map(comconsiot, reg.addr, reg.size, 0, &comconsioh))

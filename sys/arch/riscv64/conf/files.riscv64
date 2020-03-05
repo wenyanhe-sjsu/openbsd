@@ -44,11 +44,6 @@ device	mainbus: fdt
 attach	mainbus at root
 file	arch/riscv64/dev/mainbus.c			mainbus
 
-# Include WSCONS stuff
-include "dev/wscons/files.wscons"
-include "dev/rasops/files.rasops"
-include "dev/wsfont/files.wsfont"
-
 device	cpu
 attach	cpu at mainbus
 file	arch/riscv64/riscv64/cpu.c
@@ -67,9 +62,6 @@ include	"dev/hid/files.hid"
 
 # Machine-independent I2C drivers
 include "dev/i2c/files.i2c"
-
-# Include USB stuff
-include "dev/usb/files.usb"
 
 # FDT support
 include "dev/ofw/files.ofw"

@@ -123,17 +123,17 @@ inittodr(time_t base)
 void
 cpu_initclocks(void)
 {
-	panic("cpu_initclocks not implmeneted yet");
+	// XXX TODO cpu_initclocks
 }
 
 void
 cpu_startclock(void)
 {
-	panic("cpu_startclock not implemented yet");
+	// XXX TODO cpu_startclock
 }
 
 void
 setstatclockrate(int arg)
 {
-	panic("setstatclockrate not implemented yet");
+	// XXX TODO setstatclockrate
 }

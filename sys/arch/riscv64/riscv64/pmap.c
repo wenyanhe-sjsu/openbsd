@@ -1248,7 +1248,7 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	pmap_tramp.pm_privileged = 1;
 	pmap_tramp.pm_asid = 0;
 
-	/* allocate Lx entries */
+	/* allocate memory (in unit of pages) for l2 and l3 page table */
 	for (i = VP_IDX1(VM_MIN_KERNEL_ADDRESS);
 	    i <= VP_IDX1(pmap_maxkvaddr - 1);
 	    i++) {
@@ -1278,7 +1278,7 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 			vp2->l2[j] = VP_Lx(pa);
 		}
 	}
-	/* allocate Lx entries */
+	/* allocate memory for pte_desc */
 	for (i = VP_IDX1(VM_MIN_KERNEL_ADDRESS);
 	    i <= VP_IDX1(pmap_maxkvaddr - 1);
 	    i++) {
@@ -1306,12 +1306,12 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 			}
 		}
 	}
-
+	//populate an blank l0 page table
 	pa = pmap_steal_avail(Lx_TABLE_ALIGN, Lx_TABLE_ALIGN, &va);
 	memset((void *) PHYS_TO_DMAP(pa), 0, Lx_TABLE_ALIGN);
 	pmap_kernel()->pm_pt0pa = pa;
 
-	/* now that we have mapping space for everything, lets map it */
+	/* now that we have mapping-space for everything, lets map it */
 	/* all of these mappings are ram -> kernel va */
 
 #if 0	// XXX This block does not appear to do anything useful?
@@ -1363,6 +1363,8 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	vstart = pmap_map_stolen(kernelstart);
 
 	// Include the Direct Map in Kernel PMAP
+	// as gigapages, only populated the pmapvp1->l1 field,
+	// pmap->va field is not used
 	pmap_bootstrap_dmap((vaddr_t) pmap_kernel()->pm_vp.l1, ram_start, ram_end);
 
 	//switching to new page table
