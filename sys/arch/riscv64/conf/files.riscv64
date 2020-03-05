@@ -48,7 +48,8 @@ device	cpu
 attach	cpu at mainbus
 file	arch/riscv64/riscv64/cpu.c
 
-include "scsi/files.scsi"
+# Paravirtual device bus and virtio
+include "dev/pv/files.pv"
 
 file	netinet/in_cksum.c
 file	netinet/in4_cksum.c
@@ -65,8 +66,12 @@ include "dev/i2c/files.i2c"
 
 # FDT support
 include "dev/ofw/files.ofw"
+
 # Machine-independent FDT drivers
 include "dev/fdt/files.fdt"
+
+# Machine-independent SCSI drivers
+include "scsi/files.scsi"
 
 # XXX ofwbus
 # XXX timer
