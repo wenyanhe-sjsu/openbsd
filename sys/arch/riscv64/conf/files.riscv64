@@ -75,4 +75,10 @@ include "scsi/files.scsi"
 
 # XXX ofwbus
 # XXX timer
+
+#
 # XXX interrupt controller
+#
+device	plic
+attach	plic at fdt
+file	arch/riscv64/dev/plic.c

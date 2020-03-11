@@ -28,6 +28,9 @@ scsibus*        at scsi?
 # NS16550 compatible serial ports
 com*		at fdt?
 
+# Platform Level Interrupt Controller
+plic*		at fdt?
+
 virtio*		at fdt?
 #vio*		at virtio?	# Network
 vioblk*		at virtio?
