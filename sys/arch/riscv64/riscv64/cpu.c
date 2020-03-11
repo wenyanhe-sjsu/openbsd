@@ -25,7 +25,7 @@
 
 #include <uvm/uvm.h>
 
-//#include <machine/fdt.h>//XXX TODO
+#include <machine/fdt.h>
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_clock.h>
@@ -242,25 +242,28 @@ int	cpu_clockspeed(int *);
 int
 cpu_match(struct device *parent, void *cfdata, void *aux)
 {
-#if 0 //XXX
 	struct fdt_attach_args *faa = aux;
+
+#if 0	// XXX
 	uint64_t mpidr = READ_SPECIALREG(mpidr_el1);
+#endif
+
 	char buf[32];
 
 	if (OF_getprop(faa->fa_node, "device_type", buf, sizeof(buf)) <= 0 ||
 	    strcmp(buf, "cpu") != 0)
 		return 0;
-
+#if 0
 	if (ncpus < MAXCPUS || faa->fa_reg[0].addr == (mpidr & MPIDR_AFF))
-		return 1;
 #endif
-	return 0;
+	if (ncpus < MAXCPUS)
+		return 1;
 }
 
 void
 cpu_attach(struct device *parent, struct device *dev, void *aux)
 {
-#if 0//XXX
+#if 0
 	struct fdt_attach_args *faa = aux;
 	struct cpu_info *ci;
 	uint64_t mpidr = READ_SPECIALREG(mpidr_el1);

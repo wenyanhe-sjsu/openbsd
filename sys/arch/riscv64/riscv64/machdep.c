@@ -170,11 +170,10 @@ extern void	amluart_init_cons(void);
 extern void	imxuart_init_cons(void);
 extern void	mvuart_init_cons(void);
 extern void	pluart_init_cons(void);
+extern void	simplefb_init_cons(bus_space_tag_t);
 #endif 
 
 extern void	com_fdt_init_cons(void);
-extern void	simplefb_init_cons(bus_space_tag_t);
-
 
 void
 consinit(void)
@@ -198,6 +197,7 @@ consinit(void)
 
 
 //XXX TODO: need to populate console for qemu
+//maybe no longer needed, as already have cn_tab ??
 struct consdev constab[] = {
 	{ NULL }
 };
@@ -725,6 +725,8 @@ initriscv(struct riscv_bootparams *rbp)
 
 	// cninit
 	consinit();
+
+	// fdt_print_tree();
 
 	riscv64_bs_tag._space_map = map_func_save;
 
