@@ -59,7 +59,7 @@ struct cpu_cores cpu_cores_sifive[] = {
 	{ 0, NULL },
 };
 
-/* arm cores makers */
+/* riscv cores makers */
 const struct implementers {
 	int			id;
 	char			*name;
@@ -89,6 +89,57 @@ void	cpu_opp_init(struct cpu_info *, uint32_t);
 
 void	cpu_flush_bp_psci(void);
 #endif
+
+#if 0 // XXX from freebsd
+void
+identify_cpu(void)
+{
+	const struct cpu_parts *cpu_partsp;
+	uint32_t part_id;
+	uint32_t impl_id;
+	uint64_t mimpid;
+	uint64_t misa;
+	u_int cpu;
+	size_t i;
+
+	cpu_partsp = NULL;
+
+	/* TODO: can we get mimpid and misa somewhere ? */
+	mimpid = 0;
+	misa = 0;
+
+	cpu = PCPU_GET(cpuid);
+
+	impl_id	= CPU_IMPL(mimpid);
+	for (i = 0; i < nitems(cpu_implementers); i++) {
+		if (impl_id == cpu_implementers[i].impl_id ||
+		    cpu_implementers[i].impl_id == 0) {
+			cpu_desc[cpu].cpu_impl = impl_id;
+			cpu_desc[cpu].cpu_impl_name = cpu_implementers[i].impl_name;
+			cpu_partsp = cpu_parts_std;
+			break;
+		}
+	}
+
+	part_id = CPU_PART(misa);
+	for (i = 0; &cpu_partsp[i] != NULL; i++) {
+		if (part_id == cpu_partsp[i].part_id ||
+		    cpu_partsp[i].part_id == -1) {
+			cpu_desc[cpu].cpu_part_num = part_id;
+			cpu_desc[cpu].cpu_part_name = cpu_partsp[i].part_name;
+			break;
+		}
+	}
+
+	/* Print details for boot CPU or if we want verbose output */
+	if (cpu == 0 || bootverbose) {
+		printf("CPU(%d): %s %s\n", cpu,
+		    cpu_desc[cpu].cpu_impl_name,
+		    cpu_desc[cpu].cpu_part_name);
+	}
+}
+#endif
+
 void
 cpu_identify(struct cpu_info *ci)
 {
@@ -192,7 +243,9 @@ cpu_identify(struct cpu_info *ci)
 		}
 		clidr >>= 3;
 	}
+#endif
 
+#if 0 	// ARM specific stuff
 	/*
 	 * Some ARM processors are vulnerable to branch target
 	 * injection attacks (CVE-2017-5715).
@@ -236,67 +289,48 @@ cpu_identify(struct cpu_info *ci)
 
 #if 0//XXX
 int	cpu_hatch_secondary(struct cpu_info *ci, int, uint64_t);
-int	cpu_clockspeed(int *);
 #endif
+int	cpu_clockspeed(int *);
 
 int
 cpu_match(struct device *parent, void *cfdata, void *aux)
 {
 	struct fdt_attach_args *faa = aux;
 
-#if 0	// XXX
-	uint64_t mpidr = READ_SPECIALREG(mpidr_el1);
-#endif
-
 	char buf[32];
 
 	if (OF_getprop(faa->fa_node, "device_type", buf, sizeof(buf)) <= 0 ||
 	    strcmp(buf, "cpu") != 0)
 		return 0;
-#if 0
-	if (ncpus < MAXCPUS || faa->fa_reg[0].addr == (mpidr & MPIDR_AFF))
-#endif
-	if (ncpus < MAXCPUS)
+
+	if (ncpus <= MAXCPUS)	//XXX to force return 1
 		return 1;
+	return 0;
 }
 
 void
 cpu_attach(struct device *parent, struct device *dev, void *aux)
 {
-#if 0
 	struct fdt_attach_args *faa = aux;
 	struct cpu_info *ci;
-	uint64_t mpidr = READ_SPECIALREG(mpidr_el1);
-	uint32_t opp;
 
 	KASSERT(faa->fa_nreg > 0);
 
-	if (faa->fa_reg[0].addr == (mpidr & MPIDR_AFF)) {
-		ci = &cpu_info_primary;
 #ifdef MULTIPROCESSOR
-		ci->ci_flags |= CPUF_RUNNING | CPUF_PRESENT | CPUF_PRIMARY;
-#endif
-	}
-#ifdef MULTIPROCESSOR
-	else {
-		ci = malloc(sizeof(*ci), M_DEVBUF, M_WAITOK | M_ZERO);
-		cpu_info[dev->dv_unit] = ci;
-		ci->ci_next = cpu_info_list->ci_next;
-		cpu_info_list->ci_next = ci;
-		ci->ci_flags |= CPUF_AP;
-		ncpus++;
-	}
+	ci = malloc(sizeof(*ci), M_DEVBUF, M_WAITOK | M_ZERO);
+	cpu_info[dev->dv_unit] = ci;
+	ci->ci_next = cpu_info_list->ci_next;
+	cpu_info_list->ci_next = ci;
+	ci->ci_flags |= CPUF_AP;
+	ncpus++;
 #endif
 
 	ci->ci_dev = dev;
 	ci->ci_cpuid = dev->dv_unit;
-	ci->ci_mpidr = faa->fa_reg[0].addr;
 	ci->ci_node = faa->fa_node;
 	ci->ci_self = ci;
 
-	printf(" mpidr %llx:", ci->ci_mpidr);
-
-#ifdef MULTIPROCESSOR
+#ifdef MULTIPROCESSOR // XXX TBD: CMPE
 	if (ci->ci_flags & CPUF_AP) {
 		char buf[32];
 		uint64_t spinup_data = 0;
@@ -339,19 +373,17 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 			cpu_cpuspeed = cpu_clockspeed;
 		}
 
+#if 0// XXX CMPE
 		/* Initialize debug registers. */
 		WRITE_SPECIALREG(mdscr_el1, DBG_MDSCR_TDCC);
 		WRITE_SPECIALREG(oslar_el1, 0);
+#endif
+
 #ifdef MULTIPROCESSOR
 	}
 #endif
 
-	opp = OF_getpropint(ci->ci_node, "operating-points-v2", 0);
-	if (opp)
-		cpu_opp_init(ci, opp);
-
 	printf("\n");
-#endif
 }
 
 int
