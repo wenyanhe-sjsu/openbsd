@@ -127,11 +127,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 
 	// sc->sc_dev = dev;
 
-	if (OF_getpropint(faa->fa_node, "riscv,ndev", sc->ndev) < 0) {
-		printf(": could not get number of devices\n");
-		return;
-	}
-
+	sc->ndev = OF_getpropint(faa->fa_node, "riscv,ndev", 0);
 	if (sc->ndev >= PLIC_MAX_IRQS) {
 		printf(": invalid ndev (%d)\n", sc->ndev);
 		return;
