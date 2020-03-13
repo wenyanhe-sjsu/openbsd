@@ -264,38 +264,38 @@ mainbus_attach_cpus(struct device *self, cfmatch_t match)
 int
 mainbus_match_primary(struct device *parent, void *match, void *aux)
 {
-#if 0	// XXX Should probably attach CPU
 	struct fdt_attach_args *fa = aux;
 	struct cfdata *cf = match;
+
+#if 0 	// XXX need to find riscv equivalent reg??
 	uint64_t mpidr = READ_SPECIALREG(mpidr_el1);
 
 	if (fa->fa_nreg < 1 || fa->fa_reg[0].addr != (mpidr & MPIDR_AFF))
+#endif
+	if (fa->fa_nreg < 1)
 		return 0;
 
 	return (*cf->cf_attach->ca_match)(parent, match, aux);
-#else
-	return false;
-#endif
 }
 
 int
 mainbus_match_secondary(struct device *parent, void *match, void *aux)
 {
-#if 0	// XXX Should probably attach CPU
 	struct fdt_attach_args *fa = aux;
 	struct cfdata *cf = match;
+
+#if 0	// XXX need to find riscv equivalent reg??
 	uint64_t mpidr = READ_SPECIALREG(mpidr_el1);
 
 	if (fa->fa_nreg < 1 || fa->fa_reg[0].addr == (mpidr & MPIDR_AFF))
+#endif
+	if (fa->fa_nreg < 1)
 		return 0;
 
 	return (*cf->cf_attach->ca_match)(parent, match, aux);
-#else
-	return false;
-#endif
 }
 
-#if 0	// XXX No EFI for riscv64?
+#if 0	// No EFI for riscv64
 void
 mainbus_attach_efi(struct device *self)
 {

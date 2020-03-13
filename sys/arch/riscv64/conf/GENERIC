@@ -13,7 +13,7 @@ maxusers	32
 
 makeoptions	KERNEL_BASE_PHYS="0x00200000"
 makeoptions	KERNEL_BASE_VIRT="0xffffffc000200000"
-# option		DEBUG
+#option		DEBUG
 
 config	bsd	swap generic
 
@@ -27,3 +27,15 @@ scsibus*        at scsi?
 
 # NS16550 compatible serial ports
 com*		at fdt?
+
+# Platform Level Interrupt Controller
+plic*		at fdt?
+
+virtio*		at fdt?
+#vio*		at virtio?	# Network
+vioblk*		at virtio?
+#viomb*		at virtio?	# Memory Ballooning
+#viornd*	at virtio?	# Random Source
+#vioscsi*	at virtio?	# Disk (SCSI)
+
+#simplefb*	at fdt?		# Frame Buffer
