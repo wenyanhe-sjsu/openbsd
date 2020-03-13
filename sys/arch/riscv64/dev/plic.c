@@ -41,6 +41,10 @@
 
 #include <machine/bus.h>
 #include <machine/intr.h>
+#include <machine/fdt.h>
+
+#include <dev/ofw/fdt.h>
+#include <dev/ofw/openfirm.h>
 
 #define	PLIC_MAX_IRQS		1024
 
@@ -87,13 +91,13 @@ struct plic_context {
 #endif
 
 struct plic_softc {
-	struct device		sc_dev;
+	struct device *		sc_dev;
 #if 0
 	struct resource *	intc_res;
 	struct plic_irqsrc	isrcs[PLIC_MAX_IRQS];
 	struct plic_context	contexts[MAXCPU];
-	int			ndev;
 #endif
+	int			ndev;
 };
 
 struct cfattach plic_ca = {
@@ -109,12 +113,32 @@ struct cfdriver plic_cd = {
 int
 plic_match(struct device *parent, void *cfdata, void *aux)
 {
-	return 0;
+	struct fdt_attach_args *faa = aux;
+
+	return (OF_is_compatible(faa->fa_node, "riscv,plic0") ||
+		OF_is_compatible(faa->fa_node, "sifive,plic-1.0.0"));
 }
 
 void
 plic_attach(struct device *parent, struct device *dev, void *aux)
 {
+	struct plic_softc *sc = (struct plic_softc *) dev;
+	struct fdt_attach_args *faa = aux;
+
+	sc->sc_dev = dev;
+
+	if (OF_getpropint(faa->fa_node, "riscv,ndev", &sc->ndev) < 0) {
+		printf(": could not get number of devices\n");
+		return;
+	}
+
+	if (sc->ndev >= PLIC_MAX_IRQS) {
+		printf(": invalid ndev (%d)\n", sc->ndev);
+		return;
+	}
+
+	// XXX
+
 	return;
 }
 
