@@ -77,8 +77,8 @@ struct cpu_info {
 #if 0
 	uint64_t		ci_mpidr;
 	u_int			ci_acpi_proc_id;
-	int			ci_node;
 #endif
+	int			ci_node;
 	struct cpu_info		*ci_self;
 
 	struct proc		*ci_curproc;

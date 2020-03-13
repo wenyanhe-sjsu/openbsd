@@ -91,6 +91,7 @@ com_fdt_match(struct device *parent, void *match, void *aux)
 	    OF_is_compatible(faa->fa_node, "snps,dw-apb-uart") ||
 	    OF_is_compatible(faa->fa_node, "marvell,armada-38x-uart") ||
 	    OF_is_compatible(faa->fa_node, "ti,omap3-uart") ||
+	    OF_is_compatible(faa->fa_node, "ns16550a") ||
 	    OF_is_compatible(faa->fa_node, "ti,omap4-uart"));
 }
 
@@ -121,8 +122,8 @@ com_fdt_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_uarttype = COM_UART_16550;
 	sc->sc_frequency = freq ? freq : COM_FREQ;
 
-	sc->sc_reg_width = OF_getpropint(faa->fa_node, "reg-io-width", 4);
-	sc->sc_reg_shift = OF_getpropint(faa->fa_node, "reg-shift", 2);
+	sc->sc_reg_width = OF_getpropint(faa->fa_node, "reg-io-width", 0);
+	sc->sc_reg_shift = OF_getpropint(faa->fa_node, "reg-shift", 0);
 
 	if (OF_is_compatible(faa->fa_node, "snps,dw-apb-uart") ||
 	    OF_is_compatible(faa->fa_node, "marvell,armada-38x-uart"))
