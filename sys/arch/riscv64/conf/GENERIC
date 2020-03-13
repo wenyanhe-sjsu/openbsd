@@ -13,7 +13,7 @@ maxusers	32
 
 makeoptions	KERNEL_BASE_PHYS="0x00200000"
 makeoptions	KERNEL_BASE_VIRT="0xffffffc000200000"
-#option		DEBUG
+option		DEBUG
 
 config	bsd	swap generic
 
