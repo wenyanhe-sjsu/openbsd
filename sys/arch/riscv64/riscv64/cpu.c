@@ -26,14 +26,15 @@
 #include <uvm/uvm.h>
 
 #include <machine/fdt.h>
+#include <machine/elf.h>
+#include <machine/cpufunc.h>
+#include <machine/riscvreg.h>
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_clock.h>
 #include <dev/ofw/ofw_regulator.h>
 #include <dev/ofw/ofw_thermal.h>
 #include <dev/ofw/fdt.h>
-
-#include <machine/cpufunc.h>
 
 #if 0
 #include "psci.h"
@@ -43,34 +44,107 @@
 #endif
 
 /* CPU Identification */
-//XXXX TODO
-#define CPU_IMPL_SIFIVE		0x00//XXX to be figured out later
 
-struct cpu_cores {
-	int	id;
-	char	*name;
+// from FreeBSD
+/*
+ * 0x0000         CPU ID unimplemented
+ * 0x0001         UC Berkeley Rocket repo
+ * 0x0002­0x7FFE  Reserved for open-source repos
+ * 0x7FFF         Reserved for extension
+ * 0x8000         Reserved for anonymous source
+ * 0x8001­0xFFFE  Reserved for proprietary implementations
+ * 0xFFFF         Reserved for extension
+ */
+
+#define	CPU_IMPL_SHIFT		0
+#define	CPU_IMPL_MASK		(0xffff << CPU_IMPL_SHIFT)
+#define	CPU_IMPL(mimpid)	((mimpid & CPU_IMPL_MASK) >> CPU_IMPL_SHIFT)
+
+#define	CPU_PART_SHIFT		62
+#define	CPU_PART_MASK		(0x3ul << CPU_PART_SHIFT)
+#define	CPU_PART(misa)		((misa & CPU_PART_MASK) >> CPU_PART_SHIFT)
+
+#define	CPU_IMPL_UNIMPLEMEN	0x00
+#define CPU_IMPL_QEMU		0x01
+#define	CPU_IMPL_UCB_ROCKET	0x02
+#define CPU_IMPL_SIFIVE		0x03
+
+#define	CPU_PART_RV32		0x01
+#define	CPU_PART_RV64		0x02
+#define	CPU_PART_RV128		0x03
+
+/*
+ * PART ID has only 2 bits
+ *
+#define CPU_PART_QEMU_SPIKE_V1_9	0x0
+#define CPU_PART_QEMU_SPIKE_V1_10	0x0
+*/
+#define CPU_PART_QEMU_SIFIVE_E		0x01
+#define CPU_PART_QEMU_SIFIVE_U		0x02
+#define CPU_PART_QEMU_VIRT		0x03
+
+/* Hardware implementation info. These values may be empty. */
+register_t mvendorid;	/* The CPU's JEDEC vendor ID */
+register_t marchid;	/* The architecture ID */
+register_t mimpid;	/* The implementation ID */
+
+struct cpu_desc {
+	int		cpu_impl;
+	int		cpu_part_num;
+	const char	*cpu_impl_name;
+	const char	*cpu_part_name;
 };
 
-struct cpu_cores cpu_cores_none[] = {
-	{ 0, NULL },
+struct cpu_desc cpu_desc[MAXCPUS];
+
+struct cpu_parts {
+	int	part_id;
+	char	*part_name;
 };
 
-struct cpu_cores cpu_cores_sifive[] = {
-	{ 0, NULL },
+#define	CPU_PART_NONE	{ -1, "Unknown Processor" }
+
+struct cpu_parts cpu_parts_std[] = {
+	{ CPU_PART_RV32,	"RV32" },
+	{ CPU_PART_RV64,	"RV64" },
+	{ CPU_PART_RV128,	"RV128" },
+	CPU_PART_NONE,
 };
 
-/* riscv cores makers */
+struct cpu_parts cpu_parts_qemu[] = {
+/*
+	{ CPU_PART_QEMU_SPIKE_V1_9, "qemu-spike-V1.9.1" },
+	{ CPU_PART_QEMU_SPIKE_V1_10, "qemu-spike-V1.10" },
+*/
+	{ CPU_PART_QEMU_SIFIVE_E, "qemu-sifive-e" },
+	{ CPU_PART_QEMU_SIFIVE_U, "qemu-sifive-u" },
+	{ CPU_PART_QEMU_VIRT, "qemu-virt" },
+	CPU_PART_NONE,
+};
+
+struct cpu_parts cpu_parts_rocket[] = {//placeholder
+	CPU_PART_NONE,
+};
+
+struct cpu_parts cpu_parts_sifive[] = {//placeholder
+	CPU_PART_NONE,
+};
+
+/* riscv parts makers */
 const struct implementers {
-	int			id;
-	char			*name;
-	struct cpu_cores	*corelist;
+	int			impl_id;
+	char			*impl_name;
+	struct cpu_parts	*impl_partlist;
 } cpu_implementers[] = {
-	{ CPU_IMPL_SIFIVE, "SiFive", cpu_cores_sifive },
-	{ 0, NULL },
+	{ CPU_IMPL_QEMU, "QEMU", cpu_parts_qemu },
+	{ CPU_IMPL_UCB_ROCKET,	"UC Berkeley Rocket", cpu_parts_rocket },
+	{ CPU_IMPL_SIFIVE, "SiFive", cpu_parts_sifive },
+	{ CPU_IMPL_UNIMPLEMEN, "Unknown Implementer", cpu_parts_std },
 };
 
-char cpu_model[64] = "CMPE295";//XXX :)
+char cpu_model[64];
 int cpu_node;
+uint64_t elf_hwcap;//will need it for multiple heter-processors
 
 struct cpu_info *cpu_info_list = &cpu_info_primary;
 
@@ -88,201 +162,110 @@ struct cfdriver cpu_cd = {
 void	cpu_flush_bp_psci(void);
 #endif
 
-#if 0 // XXX from freebsd
+/*
+ * The ISA string is made up of a small prefix (e.g. rv64) and up to 26 letters
+ * indicating the presence of the 26 possible standard extensions. Therefore 32
+ * characters will be sufficient.
+ */
+#define	ISA_NAME_MAXLEN		32
+#define	ISA_PREFIX		"rv64"	// ("rv" __XSTRING(XLEN))
+#define	ISA_PREFIX_LEN		(sizeof(ISA_PREFIX) - 1)
+
 void
-identify_cpu(void)
+cpu_identify(struct cpu_info *ci)
 {
 	const struct cpu_parts *cpu_partsp;
-	uint32_t part_id;
-	uint32_t impl_id;
+	int part_id;
+	int impl_id;
 	uint64_t mimpid;
 	uint64_t misa;
-	u_int cpu;
-	size_t i;
+	int cpu, i, node, len;
+
+	uint64_t caps[256] = {0};
+	uint64_t hwcap;
+	char isa[ISA_NAME_MAXLEN];
 
 	cpu_partsp = NULL;
 
 	/* TODO: can we get mimpid and misa somewhere ? */
-	mimpid = 0;
-	misa = 0;
+	mimpid = 1;// for qemu
+	misa = (0x3ul << CPU_PART_SHIFT);// for virt
 
-	cpu = PCPU_GET(cpuid);
+	cpu = cpu_number();
 
+	// identify vendor
 	impl_id	= CPU_IMPL(mimpid);
 	for (i = 0; i < nitems(cpu_implementers); i++) {
-		if (impl_id == cpu_implementers[i].impl_id ||
-		    cpu_implementers[i].impl_id == 0) {
+		if (impl_id == cpu_implementers[i].impl_id) {
 			cpu_desc[cpu].cpu_impl = impl_id;
 			cpu_desc[cpu].cpu_impl_name = cpu_implementers[i].impl_name;
-			cpu_partsp = cpu_parts_std;
+			cpu_partsp = cpu_implementers[i].impl_partlist;
 			break;
 		}
 	}
 
+	// identify part number
 	part_id = CPU_PART(misa);
 	for (i = 0; &cpu_partsp[i] != NULL; i++) {
-		if (part_id == cpu_partsp[i].part_id ||
-		    cpu_partsp[i].part_id == -1) {
+		if (part_id == cpu_partsp[i].part_id) { 
 			cpu_desc[cpu].cpu_part_num = part_id;
 			cpu_desc[cpu].cpu_part_name = cpu_partsp[i].part_name;
 			break;
 		}
 	}
 
-	/* Print details for boot CPU or if we want verbose output */
-	if (cpu == 0 || bootverbose) {
-		printf("CPU(%d): %s %s\n", cpu,
+	// identify supported isa set
+	node = OF_finddevice("/cpus");
+	if (node == -1) {
+		printf("fill_elf_hwcap: Can't find cpus node\n");
+		return;
+	}
+
+	caps['i'] = caps['I'] = HWCAP_ISA_I;
+	caps['m'] = caps['M'] = HWCAP_ISA_M;
+	caps['a'] = caps['A'] = HWCAP_ISA_A;
+	caps['f'] = caps['F'] = HWCAP_ISA_F;
+	caps['d'] = caps['D'] = HWCAP_ISA_D;
+	caps['c'] = caps['C'] = HWCAP_ISA_C;
+
+	/*
+	 * Iterate through the CPUs and examine their ISA string. While we
+	 * could assign elf_hwcap to be whatever the boot CPU supports, to
+	 * handle the (unusual) case of running a system with hetergeneous
+	 * ISAs, keep only the extension bits that are common to all harts.
+	 */
+	for (node = OF_child(node); node > 0; node = OF_peer(node)) {
+		/* Skip any non-CPU nodes, such as cpu-map. */
+		if (!OF_is_compatible(node, "riscv"))
+			continue;
+
+		len = OF_getprop(node, "riscv,isa", isa, sizeof(isa));
+		KASSERT(len <= ISA_NAME_MAXLEN);
+		if (len == -1) {
+			printf("Can't find riscv,isa property\n");
+			return;
+		} else if (strncmp(isa, ISA_PREFIX, ISA_PREFIX_LEN) != 0) {
+			printf("Unsupported ISA string: %s\n", isa);
+			return;
+		}
+
+		hwcap = 0;
+		for (i = ISA_PREFIX_LEN; i < len; i++)
+			hwcap |= caps[(unsigned char)isa[i]];
+
+		if (elf_hwcap != 0)
+			elf_hwcap &= hwcap;
+		else
+			elf_hwcap = hwcap;
+	}
+
+	/* Print details for boot CPU */
+	if (cpu == 0) {
+		printf(": cpu%d: %s %s %s\n", cpu,
 		    cpu_desc[cpu].cpu_impl_name,
-		    cpu_desc[cpu].cpu_part_name);
+		    cpu_desc[cpu].cpu_part_name,
+		    isa);
 	}
-}
-#endif
-
-void
-cpu_identify(struct cpu_info *ci)
-{
-#if 0
-	uint64_t midr, impl, part;
-	uint64_t clidr, id_aa64pfr0;
-	uint32_t ctr, ccsidr, sets, ways, line;
-	const char *impl_name = NULL;
-	const char *part_name = NULL;
-	const char *il1p_name = NULL;
-	const char *sep;
-	struct cpu_cores *coreselecter = cpu_cores_none;
-	int i;
-
-	midr = READ_SPECIALREG(midr_el1);
-	impl = CPU_IMPL(midr);
-	part = CPU_PART(midr);
-
-	for (i = 0; cpu_implementers[i].name; i++) {
-		if (impl == cpu_implementers[i].id) {
-			impl_name = cpu_implementers[i].name;
-			coreselecter = cpu_implementers[i].corelist;
-			break;
-		}
-	}
-
-	for (i = 0; coreselecter[i].name; i++) {
-		if (part == coreselecter[i].id) {
-			part_name = coreselecter[i].name;
-			break;
-		}
-	}
-
-	if (impl_name && part_name) {
-		printf(" %s %s r%llup%llu", impl_name, part_name, CPU_VAR(midr),
-		    CPU_REV(midr));
-
-		if (CPU_IS_PRIMARY(ci))
-			snprintf(cpu_model, sizeof(cpu_model),
-			    "%s %s r%llup%llu", impl_name, part_name,
-			    CPU_VAR(midr), CPU_REV(midr));
-	} else {
-		printf(" Unknown, MIDR 0x%llx", midr);
-
-		if (CPU_IS_PRIMARY(ci))
-			snprintf(cpu_model, sizeof(cpu_model), "Unknown");
-	}
-
-	/* Print cache information. */
-
-	ctr = READ_SPECIALREG(ctr_el0);
-	switch (ctr & CTR_IL1P_MASK) {
-	case CTR_IL1P_AIVIVT:
-		il1p_name = "AIVIVT ";
-		break;
-	case CTR_IL1P_VIPT:
-		il1p_name = "VIPT ";
-		break;
-	case CTR_IL1P_PIPT:
-		il1p_name = "PIPT ";
-		break;
-	}
-
-	clidr = READ_SPECIALREG(clidr_el1);
-	for (i = 0; i < 7; i++) {
-		if ((clidr & CLIDR_CTYPE_MASK) == 0)
-			break;
-		printf("\n%s:", ci->ci_dev->dv_xname);
-		sep = "";
-		if (clidr & CLIDR_CTYPE_INSN) {
-			WRITE_SPECIALREG(csselr_el1,
-			    i << CSSELR_LEVEL_SHIFT | CSSELR_IND);
-			ccsidr = READ_SPECIALREG(ccsidr_el1);
-			sets = CCSIDR_SETS(ccsidr);
-			ways = CCSIDR_WAYS(ccsidr);
-			line = CCSIDR_LINE_SIZE(ccsidr);
-			printf("%s %dKB %db/line %d-way L%d %sI-cache", sep,
-			    (sets * ways * line) / 1024, line, ways, (i + 1),
-			    il1p_name);
-			il1p_name = "";
-			sep = ",";
-		}
-		if (clidr & CLIDR_CTYPE_DATA) {
-			WRITE_SPECIALREG(csselr_el1, i << CSSELR_LEVEL_SHIFT);
-			ccsidr = READ_SPECIALREG(ccsidr_el1);
-			sets = CCSIDR_SETS(ccsidr);
-			ways = CCSIDR_WAYS(ccsidr);
-			line = CCSIDR_LINE_SIZE(ccsidr);
-			printf("%s %dKB %db/line %d-way L%d D-cache", sep,
-			    (sets * ways * line) / 1024, line, ways, (i + 1));
-			sep = ",";
-		}
-		if (clidr & CLIDR_CTYPE_UNIFIED) {
-			WRITE_SPECIALREG(csselr_el1, i << CSSELR_LEVEL_SHIFT);
-			ccsidr = READ_SPECIALREG(ccsidr_el1);
-			sets = CCSIDR_SETS(ccsidr);
-			ways = CCSIDR_WAYS(ccsidr);
-			line = CCSIDR_LINE_SIZE(ccsidr);
-			printf("%s %dKB %db/line %d-way L%d cache", sep,
-			    (sets * ways * line) / 1024, line, ways, (i + 1));
-		}
-		clidr >>= 3;
-	}
-#endif
-
-#if 0 	// ARM specific stuff
-	/*
-	 * Some ARM processors are vulnerable to branch target
-	 * injection attacks (CVE-2017-5715).
-	 */
-	switch (impl) {
-	case CPU_IMPL_ARM:
-		switch (part) {
-		case CPU_PART_CORTEX_A35:
-		case CPU_PART_CORTEX_A53:
-		case CPU_PART_CORTEX_A55:
-			/* Not vulnerable. */
-			ci->ci_flush_bp = cpu_flush_bp_noop;
-			break;
-		default:
-			/*
-			 * Potentially vulnerable; call into the
-			 * firmware and hope we're running on top of
-			 * Arm Trusted Firmware with a fix for
-			 * Security Advisory TFV 6.
-			 */
-			ci->ci_flush_bp = cpu_flush_bp_psci;
-			break;
-		}
-		break;
-	default:
-		/* Not much we can do for an unknown processor.  */
-		ci->ci_flush_bp = cpu_flush_bp_noop;
-		break;
-	}
-
-	/*
-	 * The architecture has been updated to explicitly tell us if
-	 * we're not vulnerable.
-	 */
-	id_aa64pfr0 = READ_SPECIALREG(id_aa64pfr0_el1);
-	if (ID_AA64PFR0_CSV2(id_aa64pfr0) == ID_AA64PFR0_CSV2_IMPL ||
-	    ID_AA64PFR0_CSV2(id_aa64pfr0) == ID_AA64PFR0_CSV2_SCXT)
-		ci->ci_flush_bp = cpu_flush_bp_noop;
-#endif 
 }
 
 #if 0//XXX
