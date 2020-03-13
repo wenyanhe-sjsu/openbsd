@@ -57,6 +57,12 @@ file	netinet/in4_cksum.c
 #
 # XXX simplebus#
 #
+define simplebus {[early = 1]}
+device	simplebus: fdt
+attach	simplebus at fdt
+file	arch/riscv64/dev/simplebus.c		simplebus
+
+#
 # Machine-independent HID support
 #
 include	"dev/hid/files.hid"
@@ -80,5 +86,5 @@ include "scsi/files.scsi"
 # XXX interrupt controller
 #
 device	plic
-attach	plic at fdt
+attach	plic at simplebus
 file	arch/riscv64/dev/plic.c
