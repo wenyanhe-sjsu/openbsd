@@ -261,7 +261,7 @@ cpu_identify(struct cpu_info *ci)
 
 	/* Print details for boot CPU */
 	if (cpu == 0) {
-		printf(": cpu%d: %s %s %s\n", cpu,
+		printf(": cpu%d: %s %s %s", cpu,
 		    cpu_desc[cpu].cpu_impl_name,
 		    cpu_desc[cpu].cpu_part_name,
 		    isa);

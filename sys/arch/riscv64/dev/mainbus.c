@@ -119,11 +119,10 @@ mainbus_attach(struct device *parent, struct device *self, void *aux)
 		printf(": unknown model\n");
 
 	/* Attach primary CPU first. */
-	mainbus_attach_cpus(self, mainbus_match_primary);
-
-#if 0	// XXX No EFI for riscv64?
-	mainbus_attach_efi(self);
+#ifdef DEBUG
+	printf("Attaching primary CPU...\n");
 #endif
+	mainbus_attach_cpus(self, mainbus_match_primary);
 
 	sc->sc_rangeslen = OF_getproplen(OF_peer(0), "ranges");
 	if (sc->sc_rangeslen > 0 && !(sc->sc_rangeslen % sizeof(uint32_t))) {
@@ -134,10 +133,16 @@ mainbus_attach(struct device *parent, struct device *self, void *aux)
 
 	/* Scan the whole tree. */
 	sc->sc_early = 1;
+#ifdef DEBUG
+	printf("Attaching node with sc_early == 1 ...\n");
+#endif
 	for (node = OF_child(sc->sc_node); node != 0; node = OF_peer(node))
 		mainbus_attach_node(self, node, NULL);
 
 	sc->sc_early = 0;
+#ifdef DEBUG
+	printf("Attaching node with sc_early == 0 ...\n");
+#endif
 	for (node = OF_child(sc->sc_node); node != 0; node = OF_peer(node))
 		mainbus_attach_node(self, node, NULL);
 
@@ -206,6 +211,13 @@ mainbus_attach_node(struct device *self, int node, cfmatch_t submatch)
 
 	if (submatch == NULL)
 		submatch = mainbus_match_status;
+
+#ifdef DEBUG
+	char buf[32];
+	if (OF_getprop(fa.fa_node, "name", buf, sizeof(buf)) > 0)
+		printf("\ncurrent parent: %s, current node: %d-%s\n", self->dv_xname, fa.fa_node, buf);
+#endif
+
 	config_found_sm(self, &fa, NULL, submatch);
 
 	free(fa.fa_reg, M_DEVBUF, fa.fa_nreg * sizeof(struct fdt_reg));
@@ -267,11 +279,6 @@ mainbus_match_primary(struct device *parent, void *match, void *aux)
 	struct fdt_attach_args *fa = aux;
 	struct cfdata *cf = match;
 
-#if 0 	// XXX need to find riscv equivalent reg??
-	uint64_t mpidr = READ_SPECIALREG(mpidr_el1);
-
-	if (fa->fa_nreg < 1 || fa->fa_reg[0].addr != (mpidr & MPIDR_AFF))
-#endif
 	if (fa->fa_nreg < 1)
 		return 0;
 
@@ -284,35 +291,11 @@ mainbus_match_secondary(struct device *parent, void *match, void *aux)
 	struct fdt_attach_args *fa = aux;
 	struct cfdata *cf = match;
 
-#if 0	// XXX need to find riscv equivalent reg??
-	uint64_t mpidr = READ_SPECIALREG(mpidr_el1);
-
-	if (fa->fa_nreg < 1 || fa->fa_reg[0].addr == (mpidr & MPIDR_AFF))
-#endif
 	if (fa->fa_nreg < 1)
 		return 0;
 
 	return (*cf->cf_attach->ca_match)(parent, match, aux);
 }
-
-#if 0	// No EFI for riscv64
-void
-mainbus_attach_efi(struct device *self)
-{
-	struct mainbus_softc *sc = (struct mainbus_softc *)self;
-	struct fdt_attach_args fa;
-	int node = OF_finddevice("/chosen");
-
-	if (node == 0 || OF_getproplen(node, "openbsd,uefi-system-table") <= 0)
-		return;
-
-	memset(&fa, 0, sizeof(fa));
-	fa.fa_name = "efi";
-	fa.fa_iot = sc->sc_iot;
-	fa.fa_dmat = sc->sc_dmat;
-	config_found(self, &fa, NULL);
-}
-#endif
 
 void
 mainbus_attach_framebuffer(struct device *self)
