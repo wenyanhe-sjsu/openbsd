@@ -91,7 +91,7 @@ struct plic_context {
 #endif
 
 struct plic_softc {
-	struct device *		sc_dev;
+	struct device		sc_dev;// can't use pointer, need size info
 #if 0
 	struct resource *	intc_res;
 	struct plic_irqsrc	isrcs[PLIC_MAX_IRQS];
@@ -125,9 +125,9 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	struct plic_softc *sc = (struct plic_softc *) dev;
 	struct fdt_attach_args *faa = aux;
 
-	sc->sc_dev = dev;
+	// sc->sc_dev = dev;
 
-	if (OF_getpropint(faa->fa_node, "riscv,ndev", &sc->ndev) < 0) {
+	if (OF_getpropint(faa->fa_node, "riscv,ndev", sc->ndev) < 0) {
 		printf(": could not get number of devices\n");
 		return;
 	}

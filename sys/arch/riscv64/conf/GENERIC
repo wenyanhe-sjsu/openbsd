@@ -23,7 +23,7 @@ config	bsd	swap generic
 mainbus0	at root
 cpu0		at mainbus0
 
-simplebus*	at fdt?
+simplebus*	at fdt? early 1
 
 scsibus*        at scsi?
 
@@ -31,7 +31,7 @@ scsibus*        at scsi?
 com*		at fdt?
 
 # Platform Level Interrupt Controller
-plic*		at simplebus?	early 1
+plic*		at simplebus? early 1
 
 virtio*		at fdt?
 #vio*		at virtio?	# Network
