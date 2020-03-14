@@ -25,7 +25,7 @@
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/fdt.h>
 
-#include <riscv64/riscv64/riscv64var.h>
+#include <machine/riscv64var.h>
 #include <riscv64/dev/mainbus.h>
 
 int mainbus_match(struct device *, void *, void *);
