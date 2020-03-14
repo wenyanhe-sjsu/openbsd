@@ -40,6 +40,7 @@
 #include <sys/proc.h>
 
 #include <machine/bus.h>
+#include <machine/cpu.h>
 #include <machine/intr.h>
 #include <machine/fdt.h>
 
@@ -78,17 +79,23 @@
 int	plic_match(struct device *, void *, void *);
 void	plic_attach(struct device *, struct device *, void *);
 
+int	plic_spllower(int);
+void	plic_splx(int);
+int	plic_splraise(int);
+void	plic_setipl(int);
+void	plic_irq_handler(void *);
+
 #if 0 // XXX
 struct plic_irqsrc {
 	struct intr_irqsrc	isrc;
 	u_int			irq;
 };
+#endif
 
 struct plic_context {
 	bus_size_t enable_offset;
 	bus_size_t context_offset;
 };
-#endif
 
 struct plic_softc {
 	struct device		sc_dev;
@@ -97,8 +104,8 @@ struct plic_softc {
 #if 0
 	struct resource *	intc_res;
 	struct plic_irqsrc	isrcs[PLIC_MAX_IRQS];
-	struct plic_context	contexts[MAXCPU];
 #endif
+	struct plic_context	contexts[MAXCPUS];
 	int			ndev;
 };
 
@@ -127,7 +134,6 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	struct plic_softc *sc = (struct plic_softc *) dev;
 	struct fdt_attach_args *faa = aux;
 
-	// sc->sc_dev = dev;
 	sc->sc_iot = faa->fa_iot;
 
 	sc->ndev = OF_getpropint(faa->fa_node, "riscv,ndev", 0);
@@ -141,7 +147,15 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	    faa->fa_reg[0].size, 0, &sc->sc_ioh))
 		panic("%s: bus_space_map failed!", __func__);
 
-	// XXX Register interrupt sources
+	// XXX Register interrupt sources?
+	// XXX Disable all interrupts?
+	// XXX Clear all pending interrupts?
+
+
+
+	/* insert self as interrupt handler */
+	riscv_set_intr_handler(plic_splraise, plic_spllower, plic_splx,
+	    plic_setipl, plic_irq_handler);
 
 	return;
 }
@@ -149,6 +163,89 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 /*
  * end of driver hooks  ===============
  */
+
+void
+plic_splx(int new)
+{
+#if 0
+	struct cpu_info *ci = curcpu();
+
+	if (ci->ci_ipending & arm_smask[new])
+		arm_do_pending_intr(new);
+
+	plic_setipl(new);
+#else
+	panic("plic_splx unimplemented");
+#endif
+}
+
+int
+plic_spllower(int new)
+{
+#if 0
+	struct cpu_info *ci = curcpu();
+	int old = ci->ci_cpl;
+	plic_splx(new);
+	return (old);
+#else
+	panic("plic_spllower unimplemented");
+	return (new);
+#endif
+}
+
+int
+plic_splraise(int new)
+{
+#if 0
+	struct cpu_info *ci = curcpu();
+	int old;
+	old = ci->ci_cpl;
+
+	/*
+	 * setipl must always be called because there is a race window
+	 * where the variable is updated before the mask is set
+	 * an interrupt occurs in that window without the mask always
+	 * being set, the hardware might not get updated on the next
+	 * splraise completely messing up spl protection.
+	 */
+	if (old > new)
+		new = old;
+
+	plic_setipl(new);
+
+	return (old);
+#else
+	panic("plic_splraise unimplemented");
+	return (new);
+#endif
+}
+
+void
+plic_setipl(int new)
+{
+#if 0
+	struct cpu_info		*ci = curcpu();
+	//struct plic_softc	*sc = plic;
+	int			 psw;
+
+	/* disable here is only to keep hardware in sync with ci->ci_cpl */
+	psw = disable_interrupts();
+	ci->ci_cpl = new;
+
+	/* low values are higher priority thus IPL_HIGH - pri */
+	bus_space_write_4(sc->sc_iot, sc->sc_p_ioh, ICPIPMR,
+	    (IPL_HIGH - new) << ICMIPMR_SH);
+	restore_interrupts(psw);
+#else
+	panic("plic_setipl unimplemented");
+#endif
+}
+
+void
+plic_irq_handler(void *frame)
+{
+	panic("plic_irq_handler unimplemented");
+}
 
 #if 0 // XXX till end
 static u_int plic_irq_cpu;

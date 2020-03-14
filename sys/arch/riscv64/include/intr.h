@@ -83,6 +83,7 @@ int	 splraise(int);
 int	 spllower(int);
 void	 splx(int);
 
+void	 riscv_cpu_intr(void *);
 void	 riscv_do_pending_intr(int);
 void	 riscv_set_intr_handler(int (*raise)(int), int (*lower)(int),
     void (*x)(int), void (*setipl)(int),
