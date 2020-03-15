@@ -55,6 +55,13 @@ device	simplebus: fdt
 attach	simplebus at fdt
 file	arch/riscv64/dev/simplebus.c		simplebus
 
+#
+# timer
+#
+device	timer
+attach	timer at fdt
+file	arch/riscv64/dev/timer.c
+
 device	cpu
 attach	cpu at mainbus
 file	arch/riscv64/riscv64/cpu.c
