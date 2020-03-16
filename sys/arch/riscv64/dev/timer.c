@@ -228,7 +228,7 @@ riscv_timer_attach(struct device *parent, struct device *self, void *aux)
 #endif
 
 	sc->sc_clkfreq = riscv_timer_get_timebase();
-	if (sc->sc_clkfreq != 0) {
+	if (sc->sc_clkfreq == 0) {
 		printf("No clock frequency specified\n");
 		return;
 	}
