@@ -29,7 +29,7 @@ timer*		at fdt? early 1
 scsibus*        at scsi?
 
 # NS16550 compatible serial ports
-com*		at fdt?
+com*		at fdt? early 1
 
 # Platform Level Interrupt Controller
 plic*		at simplebus? early 1

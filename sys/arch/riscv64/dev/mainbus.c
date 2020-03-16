@@ -99,8 +99,9 @@ mainbus_attach(struct device *parent, struct device *self, void *aux)
 	struct mainbus_softc *sc = (struct mainbus_softc *)self;
 	char model[128];
 	int node, len;
+
+	riscv_intr_init_fdt();
 #if 0
-	arm_intr_init_fdt();
 	agtimer_init();
 #endif
 	sc->sc_node = OF_peer(0);
