@@ -30,7 +30,6 @@
 
 #include "riscv_cpu_intc.h"
 
-
 struct intrhand {
 	int (*ih_func)(void *);		/* handler */
 	void *ih_arg;			/* arg for handler */
@@ -41,34 +40,27 @@ struct intrhand {
 struct intrhand* intc_handler[INTC_NIRQS] = {NULL};
 struct interrupt_controller intc_ic;
 
-int	intc_match(struct device *, void *, void *);
-void	intc_attach(struct device *, struct device *, void *);
-
-struct cfattach	intc_ca = {
-	sizeof (struct device), intc_match, intc_attach
-};
-
-struct cfdriver intc_cd = {
-	NULL, "rv_cpu_intc", DV_DULL
-};
-
+/* node points to cpu */
 int
-intc_match(struct device *parent, void *match, void *aux)
+intc_init(int node)
 {
-	struct fdt_attach_args *faa = aux;
-
-	return (OF_is_compatible(faa->fa_node, "riscv,cpu-intc"));
-}
-
-void
-intc_attach(struct device *parent, struct device *self, void *aux)
-{
-	struct fdt_attach_args *faa = aux;
-
-	intc_ic.ic_node = faa->fa_node;
-	intc_ic.ic_establish = intc_intr_establish_fdt;
-	intc_ic.ic_disestablish = intc_intr_disestablish;
-	riscv_intr_register_fdt(&intc_ic);
+	int cpu_node = node;
+	for (node = OF_child(node); node; node = OF_peer(node)) {
+		if (OF_getproplen(node, "interrupt-controller") >= 0 &&
+				OF_is_compatible(node, "riscv,cpu-intc")) {
+#if DEBUG_INTC
+			printf("\nattaching ic (node %d) for cpu (node %d)",
+					node, cpu_node);
+#endif
+			intc_ic.ic_node = node;
+			intc_ic.ic_cookie = &intc_ic;
+			intc_ic.ic_establish = intc_intr_establish_fdt;
+			intc_ic.ic_disestablish = intc_intr_disestablish;
+			riscv_intr_register_fdt(&intc_ic);
+			return 0;
+		}
+	}
+	return 1;
 }
 
 void

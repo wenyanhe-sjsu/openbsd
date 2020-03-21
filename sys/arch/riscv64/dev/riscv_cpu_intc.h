@@ -17,15 +17,13 @@
 #ifndef _RISCV_CPU_INTC_H_
 #define _RISCV_CPU_INTC_H_
 
-void intc_irq_handler(void *);
-
-void *intc_intr_establish(int irqno, int, int (*func)(void *),
-    void *cookie, char *name);
-
-void *intc_intr_establish_fdt(void *, int *, int, int (*)(void *),
+int 	intc_init(int);
+void 	intc_irq_handler(void *);
+void 	*intc_intr_establish(int, int, int (*func)(void *),
+    void *, char *);
+void 	*intc_intr_establish_fdt(void *, int *, int, int (*)(void *),
 	    void *, char *);
-
-void intc_intr_disestablish(void *cookie);
+void 	intc_intr_disestablish(void *cookie);
 
 #endif /* _RISCV_CPU_INTC_H_ */
 
