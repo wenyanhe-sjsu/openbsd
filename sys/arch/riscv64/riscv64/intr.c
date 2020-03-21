@@ -23,7 +23,7 @@
 #include <machine/cpu.h>
 #include <machine/intr.h>
 #include <machine/frame.h>
-#include "../dev/riscv_cpu_intc.h"
+#include "riscv64/dev/riscv_cpu_intc.h"
 
 #include <dev/ofw/openfirm.h>
 
