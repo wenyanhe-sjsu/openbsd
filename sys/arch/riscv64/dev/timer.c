@@ -63,6 +63,8 @@
 #include <machine/intr.h>
 #include <machine/asm.h>
 #include <machine/trap.h>
+#include <machine/fdt.h>
+#include "timer.h"
 #if 0
 #include <machine/sbi.h>
 #endif
@@ -206,10 +208,14 @@ riscv_timer_get_timebase()
 int
 riscv_timer_match(struct device *parent, void *cfdata, void *aux)
 {
+	struct fdt_attach_args *fa = (struct fdt_attach_args *)aux;
 	if (riscv_timer_sc)
 		return (0);
 
-	return (1);
+	if (OF_is_compatible(fa->fa_node, "riscv,clint0"))
+		return (1);
+
+	return (0);
 }
 
 void
@@ -328,5 +334,46 @@ DELAY(int usec)
 		first = last;
 	}
 	TSEXIT();
+}
+#endif
+
+#if 0 //XXX moved out from intr.c
+void riscv_dflt_delay(u_int usecs);
+
+struct {
+	void	(*delay)(u_int);
+	void	(*initclocks)(void);
+	void	(*setstatclockrate)(int);
+	void	(*mpstartclock)(void);
+} riscv_clock_func = {
+	riscv_dflt_delay,
+	NULL,
+	NULL,
+	NULL
+};
+
+void
+riscv_clock_register(void (*initclock)(void), void (*delay)(u_int),
+    void (*statclock)(int), void(*mpstartclock)(void))
+{
+	if (riscv_clock_func.initclocks)
+		return;
+
+	riscv_clock_func.initclocks = initclock;
+	riscv_clock_func.delay = delay;
+	riscv_clock_func.setstatclockrate = statclock;
+	riscv_clock_func.mpstartclock = mpstartclock;
+}
+
+void
+riscv_dflt_delay(u_int usecs)
+{
+	int j;
+	/* BAH - there is no good way to make this close */
+	/* but this isn't supposed to be used after the real clock attaches */
+	for (; usecs > 0; usecs--)
+		for (j = 100; j > 0; j--)
+			;
+
 }
 #endif
