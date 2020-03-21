@@ -120,7 +120,7 @@ mainbus_attach(struct device *parent, struct device *self, void *aux)
 		printf(": unknown model\n");
 
 	/* Attach primary CPU first. */
-#ifdef DEBUG
+#ifdef DEBUG_AUTOCONF
 	printf("Attaching primary CPU...\n");
 #endif
 	mainbus_attach_cpus(self, mainbus_match_primary);
@@ -134,14 +134,14 @@ mainbus_attach(struct device *parent, struct device *self, void *aux)
 
 	/* Scan the whole tree. */
 	sc->sc_early = 1;
-#ifdef DEBUG
+#ifdef DEBUG_AUTOCONF
 	printf("Attaching node with sc_early == 1 ...\n");
 #endif
 	for (node = OF_child(sc->sc_node); node != 0; node = OF_peer(node))
 		mainbus_attach_node(self, node, NULL);
 
 	sc->sc_early = 0;
-#ifdef DEBUG
+#ifdef DEBUG_AUTOCONF
 	printf("Attaching node with sc_early == 0 ...\n");
 #endif
 	for (node = OF_child(sc->sc_node); node != 0; node = OF_peer(node))
@@ -213,7 +213,7 @@ mainbus_attach_node(struct device *self, int node, cfmatch_t submatch)
 	if (submatch == NULL)
 		submatch = mainbus_match_status;
 
-#ifdef DEBUG
+#ifdef DEBUG_AUTOCONF
 	char buf[32];
 	if (OF_getprop(fa.fa_node, "name", buf, sizeof(buf)) > 0)
 		printf("\ncurrent parent: %s, current node: %d-%s\n", self->dv_xname, fa.fa_node, buf);
@@ -267,6 +267,9 @@ mainbus_attach_cpus(struct device *self, cfmatch_t match)
 		    strcmp(buf, "cpu") == 0)
 			ncpusfound++;
 
+#ifdef DEBUG_AUTOCONF
+	       printf("scanning cpus subnode: %d\n", node);
+#endif
 		mainbus_attach_node(self, node, match);
 	}
 

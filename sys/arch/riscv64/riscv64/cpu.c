@@ -29,6 +29,7 @@
 #include <machine/elf.h>
 #include <machine/cpufunc.h>
 #include <machine/riscvreg.h>
+#include "../dev/riscv_cpu_intc.h"
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_clock.h>
@@ -354,11 +355,10 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 			cpu_cpuspeed = cpu_clockspeed;
 		}
 
-#if 0// XXX CMPE
-		/* Initialize debug registers. */
-		WRITE_SPECIALREG(mdscr_el1, DBG_MDSCR_TDCC);
-		WRITE_SPECIALREG(oslar_el1, 0);
-#endif
+		/* initialize the cpu's interrupt controller */
+		if (intc_init(ci->ci_node) > 0)
+			printf("\ncpu %d has no embedded ic",
+					ci->ci_node);
 
 #ifdef MULTIPROCESSOR
 	}
