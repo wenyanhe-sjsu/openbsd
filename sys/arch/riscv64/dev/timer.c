@@ -208,14 +208,20 @@ riscv_timer_get_timebase()
 int
 riscv_timer_match(struct device *parent, void *cfdata, void *aux)
 {
-	struct fdt_attach_args *fa = (struct fdt_attach_args *)aux;
-	if (riscv_timer_sc)
-		return (0);
+	if (riscv_timer_sc)	//already attached
+		return 0;
 
-	if (OF_is_compatible(fa->fa_node, "riscv,clint0"))
-		return (1);
+	int node;
+	// struct fdt_attach_args *fa = (struct fdt_attach_args *)aux;
 
-	return (0);
+	/*
+	 * return 1 if:
+	 * we can find valid "timebase-frequency" property from cpus
+	 */
+	if ( (node = OF_finddevice("/cpus")) == 0)
+		return 0;
+
+	return (OF_getproplen(node, "timebase-frequency") == 4);//32bit uint
 }
 
 void
