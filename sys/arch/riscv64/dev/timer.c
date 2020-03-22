@@ -58,7 +58,6 @@
 #define	TIMER_COUNTS		0x00
 #define	TIMER_MTIMECMP(cpu)	(cpu * 8)
 #define TIMER_FREQUENCY		10 * 1000 * 1000 /* RISC-V time clock */
-int32_t riscv_timer_frequency = TIMER_FREQUENCY;
 
 unsigned	riscv_timer_get_timecount(struct timecounter *);
 
@@ -238,12 +237,6 @@ riscv_timer_cpu_initclocks()
 	stathz = hz;
 	profhz = hz * 10;
 
-#if 0	// XXX Not necessary? RISC-V timer always runs at constant frequency
-	if (sc->sc_clkfreq != riscv_timer_frequency) {
-		riscv_timer_set_clockrate(agtimer_frequency);
-	}
-#endif
-
 	riscv_timer_setstatclockrate(stathz);
 
 	sc->sc_ticks_per_intr = sc->sc_ticks_per_second / hz;
@@ -344,7 +337,6 @@ riscv_timer_init(void)
 	cntfrq = riscv_timer_get_freq();
 
 	if (cntfrq != 0) {
-		riscv_timer_frequency = cntfrq;
 		riscv_clock_register(NULL, riscv_timer_delay, NULL, NULL);
 	}
 }
