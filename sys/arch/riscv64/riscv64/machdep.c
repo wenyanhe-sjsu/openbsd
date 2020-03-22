@@ -726,7 +726,9 @@ initriscv(struct riscv_bootparams *rbp)
 	// cninit
 	consinit();
 
-	// fdt_print_tree();
+#ifdef	DEBUG_AUTOCONF
+	fdt_print_tree();
+#endif
 
 	riscv64_bs_tag._space_map = map_func_save;
 
