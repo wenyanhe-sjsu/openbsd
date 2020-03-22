@@ -109,7 +109,7 @@ struct cfattach timer_ca = {
 };
 
 struct cfdriver timer_cd = {
-	NULL, "rvtimer", DV_DULL
+	NULL, "riscv_timer", DV_DULL
 };
 
 static inline uint64_t
@@ -194,10 +194,6 @@ riscv_timer_attach(struct device *parent, struct device *self, void *aux)
 
 	riscv_timer_sc = sc;
 
-	/* Setup IRQs handler */
-	riscv_intc_intr_establish(IRQ_TIMER_SUPERVISOR, 0, 
-			riscv_timer_intr, sc, "riscv_timer");
-
 	riscv_clock_register(riscv_timer_cpu_initclocks, riscv_timer_delay,
 	    riscv_timer_setstatclockrate, riscv_timer_startclock);
 
@@ -244,18 +240,14 @@ riscv_timer_cpu_initclocks()
 	pc->pc_ticks_err_sum = 0;
 
 	/* configure virtual timer interupt */
-	sc->sc_ih = riscv_intr_establish_fdt_idx(sc->sc_node, 2,
-	    IPL_CLOCK|IPL_MPSAFE, riscv_timer_intr, NULL, "tick");
+	sc->sc_ih = riscv_intc_intr_establish(IRQ_TIMER_SUPERVISOR, 0,
+			riscv_timer_intr, NULL, "riscv_timer");
 
 	next = get_cycles() + sc->sc_ticks_per_intr;
 	pc->pc_nexttickevent = pc->pc_nextstatevent = next;
 
 	sbi_set_timer(next);
 	csr_set(sie, SIE_STIE);
-	// Supervisor Interrupt Enabled is OFF at this point
-	// Can set SSTATUS_SIE to ON below to supervisor timer interrupt loop
-	// XXX Figure out where to enable Supervisor Interrupts
-	// csr_set(sstatus, SSTATUS_SIE);
 }
 
 void
