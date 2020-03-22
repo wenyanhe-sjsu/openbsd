@@ -542,7 +542,6 @@ riscv_clock_register(void (*initclock)(void), void (*delay)(u_int),
 	riscv_clock_func.mpstartclock = mpstartclock;
 }
 
-
 void
 delay(u_int usec)
 {
@@ -576,7 +575,6 @@ riscv_dflt_delay(u_int usecs)
 	for (; usecs > 0; usecs--)
 		for (j = 100; j > 0; j--)
 			;
-
 }
 
 void
