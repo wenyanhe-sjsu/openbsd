@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2005,2008 Dale Rahn <drahn@openbsd.com>
- * Copyright (c) 2012-2013 Patrick Wildt <patrick@blueri.se>
+ * Copyright (c) 2020 Mars Li <mengshi.li.mars@gmai..com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -15,10 +14,15 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef __RISCV64VAR_H__
-#define __RISCV64VAR_H__
+#ifndef _RISCV_CPU_INTC_H_
+#define _RISCV_CPU_INTC_H_
 
-extern bus_space_t riscv64_bs_tag;
+void 	riscv_intc_irq_handler(void *);
+void 	*riscv_intc_intr_establish(int, int, int (*func)(void *),
+    void *, char *);
+void 	*riscv_intc_intr_establish_fdt(void *, int *, int, int (*)(void *),
+	    void *, char *);
+void 	riscv_intc_intr_disestablish(void *cookie);
 
-#endif /* __RISCV64VAR_H__ */
+#endif /* _RISCV_CPU_INTC_H_ */
 
