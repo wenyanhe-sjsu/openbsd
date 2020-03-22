@@ -29,7 +29,6 @@
 #include <machine/elf.h>
 #include <machine/cpufunc.h>
 #include <machine/riscvreg.h>
-#include "../dev/riscv_cpu_intc.h"
 #include "../dev/timer.h"
 
 #include <dev/ofw/openfirm.h>
@@ -356,19 +355,32 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 			cpu_cpuspeed = cpu_clockspeed;
 		}
 
-		/* attach timer under cpu */
+		/*
+		 * attach cpu-embedded timer
+		 * Trick: timer has no fdt node to match,
+		 * riscv_timer_match will always return 1 at first call,
+		 * and return 0 for all following calls,
+		 * therefore, must attach timer before any node
+		 */
 		config_found_sm(dev, NULL, NULL, riscv_timer_match);
+		printf("\n");
 
-		/* initialize the cpu's interrupt controller */
-		if (intc_init(ci->ci_node) > 0)
-			printf("\ncpu %d has no embedded ic",
-					ci->ci_node);
+		/*
+		 * attach cpu's children node, so far there is only the
+		 * cpu-embedded interrupt controller
+		 */
+		struct fdt_attach_args	 fa_intc;
+		int node;
+		for (node = OF_child(faa->fa_node); node; node = OF_peer(node)) {
+			fa_intc.fa_node = node;
+			/* no specifying match func, will call cfdata's match func*/
+			config_found(dev, &fa_intc, NULL);
+			printf("\n");
+		}
 
 #ifdef MULTIPROCESSOR
 	}
 #endif
-
-	printf("\n");
 }
 
 int

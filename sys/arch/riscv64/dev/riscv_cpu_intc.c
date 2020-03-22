@@ -40,31 +40,40 @@ struct intrhand {
 struct intrhand* intc_handler[INTC_NIRQS] = {NULL};
 struct interrupt_controller intc_ic;
 
-/* node points to cpu */
+int	riscv_intc_match(struct device *, void *, void *);
+void	riscv_intc_attach(struct device *, struct device *, void *);
+
+struct cfattach        intc_ca = {
+       sizeof (struct device), riscv_intc_match, riscv_intc_attach
+};
+
+struct cfdriver intc_cd = {
+       NULL, "rv_cpu_intc", DV_DULL
+};
+
 int
-intc_init(int node)
+riscv_intc_match(struct device *parent, void *match, void *aux)
 {
-	int cpu_node = node;
-	for (node = OF_child(node); node; node = OF_peer(node)) {
-		if (OF_getproplen(node, "interrupt-controller") >= 0 &&
-				OF_is_compatible(node, "riscv,cpu-intc")) {
-#if DEBUG_INTC
-			printf("\nattaching ic (node %d) for cpu (node %d)",
-					node, cpu_node);
-#endif
-			intc_ic.ic_node = node;
-			intc_ic.ic_cookie = &intc_ic;
-			intc_ic.ic_establish = intc_intr_establish_fdt;
-			intc_ic.ic_disestablish = intc_intr_disestablish;
-			riscv_intr_register_fdt(&intc_ic);
-			return 0;
-		}
-	}
-	return 1;
+	struct fdt_attach_args *faa = aux;
+	int node = faa->fa_node;
+	return (OF_getproplen(node, "interrupt-controller") >= 0 &&
+		OF_is_compatible(node, "riscv,cpu-intc"));
 }
 
 void
-intc_irq_handler(void *frame)
+riscv_intc_attach(struct device *parent, struct device *self, void *aux)
+{
+	struct fdt_attach_args *faa = aux;/* should only use fa_node field */
+
+	intc_ic.ic_node = faa->fa_node;
+	intc_ic.ic_cookie = &intc_ic;
+	intc_ic.ic_establish = riscv_intc_intr_establish_fdt;
+	intc_ic.ic_disestablish = riscv_intc_intr_disestablish;
+	riscv_intr_register_fdt(&intc_ic);
+}
+
+void
+riscv_intc_irq_handler(void *frame)
 {
 	int irq;
 	struct intrhand *ih;
@@ -85,7 +94,7 @@ intc_irq_handler(void *frame)
 }
 
 void *
-intc_intr_establish(int irqno, int dummy_level, int (*func)(void *),
+riscv_intc_intr_establish(int irqno, int dummy_level, int (*func)(void *),
     void *arg, char *name)
 {
 	int psw;
@@ -111,14 +120,14 @@ intc_intr_establish(int irqno, int dummy_level, int (*func)(void *),
 }
 
 void *
-intc_intr_establish_fdt(void *cookie, int *cell, int dummy_level,
+riscv_intc_intr_establish_fdt(void *cookie, int *cell, int dummy_level,
 		int (*func)(void *), void *arg, char *name)
 {
-	return intc_intr_establish(cell[0], 0, func, arg, name);
+	return riscv_intc_intr_establish(cell[0], 0, func, arg, name);
 }
 
 void
-intc_intr_disestablish(void *cookie)
+riscv_intc_intr_disestablish(void *cookie)
 {
 	int psw;
 	struct intrhand *ih = cookie;
