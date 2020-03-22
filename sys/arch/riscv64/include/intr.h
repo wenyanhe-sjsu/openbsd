@@ -184,7 +184,12 @@ extern uint32_t riscv_smask[NIPL];
 
 #include <machine/softintr.h>
 
-/***** interrupt controller structure and routines *****/
+void 	riscv_clock_register(void (*)(void), void (*)(u_int), void (*)(int),
+    void (*)(void));
+
+/*
+ **** interrupt controller structure and routines ****
+ */
 struct cpu_info;
 struct interrupt_controller {
 	int	ic_node;

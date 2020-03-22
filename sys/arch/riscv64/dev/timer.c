@@ -64,10 +64,8 @@
 #include <machine/asm.h>
 #include <machine/trap.h>
 #include <machine/fdt.h>
-#include "timer.h"
-#if 0
 #include <machine/sbi.h>
-#endif
+#include "riscv_cpu_intc.h"
 
 #if 0
 #include <dev/fdt/fdt_common.h>
@@ -83,17 +81,20 @@ struct riscv_timer_softc {
 	struct device		 sc_dev;
 	void			*sc_ih;
 	uint32_t		 sc_clkfreq;
-#if 0	// FreeBSD Specific?
-	struct eventtimer	et;
-#endif
 };
 
 static struct riscv_timer_softc *riscv_timer_sc = NULL;
 
 int		riscv_timer_match(struct device *, void *, void *);
 void		riscv_timer_attach(struct device *, struct device *, void *);
-unsigned	riscv_timer_get_timecount(struct timecounter *);
 
+unsigned	riscv_timer_get_timecount(struct timecounter *);
+int		riscv_timer_get_timebase();
+int		riscv_timer_intr(void *);
+void		riscv_timer_initclocks();
+void		riscv_timer_delay(u_int);
+void		riscv_timer_setstatclockrate(int);
+void		riscv_timer_start();
 
 static struct timecounter riscv_timer_timecount = {
 	.tc_name           = "RISC-V Timecounter",
@@ -104,7 +105,6 @@ static struct timecounter riscv_timer_timecount = {
 	.tc_quality        = 1000,
 };
 
-
 struct cfattach timer_ca = {
 	sizeof (struct riscv_timer_softc), riscv_timer_match, riscv_timer_attach
 };
@@ -112,98 +112,6 @@ struct cfattach timer_ca = {
 struct cfdriver timer_cd = {
 	NULL, "timer", DV_DULL
 };
-
-#if 0
-inline uint64_t
-get_cycles(void)
-{
-	return (rdtime());
-}
-#endif
-
-long
-get_counts(struct riscv_timer_softc *sc)
-{
-	uint64_t counts;
-
-	//counts = get_cycles(); // XXX Figure error with inline get_cycles()?
-	counts = rdtime();
-
-	return (counts);
-}
-
-unsigned
-riscv_timer_get_timecount(struct timecounter *tc)
-{
-	struct riscv_timer_softc *sc;
-
-	sc = tc->tc_priv;
-
-	return (get_counts(sc));
-}
-
-#if 0
-static int
-riscv_timer_start(struct eventtimer *et, sbintime_t first, sbintime_t period)
-{
-	uint64_t counts;
-
-	if (first != 0) {
-		counts = ((uint32_t)et->et_frequency * first) >> 32;
-		sbi_set_timer(get_cycles() + counts);
-		csr_set(sie, SIE_STIE);
-
-		return (0);
-	}
-
-	return (EINVAL);
-
-}
-
-static int
-riscv_timer_stop(struct eventtimer *et)
-{
-
-	/* TODO */
-
-	return (0);
-}
-
-static int
-riscv_timer_intr(void *arg)
-{
-	struct riscv_timer_softc *sc;
-
-	sc = (struct riscv_timer_softc *)arg;
-
-	csr_clear(sip, SIP_STIP);
-
-	if (sc->et.et_active)
-		sc->et.et_event_cb(&sc->et, sc->et.et_arg);
-
-	return (FILTER_HANDLED);
-}
-#endif // 0
-
-int
-riscv_timer_get_timebase()
-{
-	int node, len;
-
-	node = OF_finddevice("/cpus");
-	if (node == -1) {
-		printf("Can't find cpus node.\n");
-		return (0);
-	}
-
-	len = OF_getproplen(node, "timebase-frequency");
-	if (len != 4) {
-		printf("Can't find timebase-frequency property.\n");
-		return (0);
-	}
-
-	return OF_getpropint(node, "timebase-frequency", 0);
-}
 
 int
 riscv_timer_match(struct device *parent, void *cfdata, void *aux)
@@ -247,58 +155,126 @@ riscv_timer_attach(struct device *parent, struct device *self, void *aux)
 
 	riscv_timer_sc = sc;
 
-#if 0	// XXX TODO
 	/* Setup IRQs handler */
-	error = riscv_setup_intr(device_get_nameunit(dev), riscv_timer_intr,
-	    NULL, sc, IRQ_TIMER_SUPERVISOR, INTR_TYPE_CLK, &sc->ih);
-	if (error) {
-		device_printf(dev, "Unable to alloc int resource.\n");
-		return (ENXIO);
-	}
-#endif
+	riscv_intc_intr_establish(IRQ_TIMER_SUPERVISOR, 0, 
+			riscv_timer_intr, sc, "riscv_timer");
+
+	riscv_clock_register(riscv_timer_initclocks, riscv_timer_delay,
+	    riscv_timer_setstatclockrate, riscv_timer_start);
 
 	riscv_timer_timecount.tc_frequency = sc->sc_clkfreq;
 	riscv_timer_timecount.tc_priv = sc;
 	tc_init(&riscv_timer_timecount);
-
-#if 0	// FreeBSD Specific?
-	sc->et.et_name = "RISC-V Eventtimer";
-	sc->et.et_flags = ET_FLAGS_ONESHOT | ET_FLAGS_PERCPU;
-	sc->et.et_quality = 1000;
-
-	sc->et.et_frequency = sc->clkfreq;
-	sc->et.et_min_period = (0x00000002LLU << 32) / sc->et.et_frequency;
-	sc->et.et_max_period = (0xfffffffeLLU << 32) / sc->et.et_frequency;
-	sc->et.et_start = riscv_timer_start;
-	sc->et.et_stop = riscv_timer_stop;
-	sc->et.et_priv = sc;
-	et_register(&sc->et);
-#endif
 }
 
-#if 0	// FreeBSD Specific Stuff
-static device_method_t riscv_timer_methods[] = {
-	DEVMETHOD(device_probe,		riscv_timer_probe),
-	DEVMETHOD(device_attach,	riscv_timer_attach),
-	{ 0, 0 }
-};
-
-static driver_t riscv_timer_driver = {
-	"timer",
-	riscv_timer_methods,
-	sizeof(struct riscv_timer_softc),
-};
-
-static devclass_t riscv_timer_devclass;
-
-EARLY_DRIVER_MODULE(timer, nexus, riscv_timer_driver, riscv_timer_devclass,
-    0, 0, BUS_PASS_TIMER + BUS_PASS_ORDER_MIDDLE);
-#endif // 0
-
-#if 0	// XXX TODO
-void
-DELAY(int usec)
+int
+riscv_timer_intr(void *arg)
 {
+#if 0
+	struct riscv_timer_softc *sc;
+
+	sc = (struct riscv_timer_softc *)arg;
+
+	csr_clear(sip, SIP_STIP);
+
+	if (sc->et.et_active)
+		sc->et.et_event_cb(&sc->et, sc->et.et_arg);
+
+	return (FILTER_HANDLED);
+#endif
+	return 0;
+}
+
+#if 0
+inline uint64_t
+get_cycles(void)
+{
+	return (rdtime());
+}
+#endif
+
+long
+get_counts(struct riscv_timer_softc *sc)
+{
+	uint64_t counts;
+
+	//counts = get_cycles(); // XXX Figure error with inline get_cycles()?
+	counts = rdtime();
+
+	return (counts);
+}
+
+unsigned
+riscv_timer_get_timecount(struct timecounter *tc)
+{
+	struct riscv_timer_softc *sc;
+
+	sc = tc->tc_priv;
+
+	return (get_counts(sc));
+}
+
+void
+riscv_timer_initclocks()
+{
+
+// XXX TODO
+}
+
+void
+riscv_timer_setstatclockrate(int newhz)
+{
+
+// XXX TODO
+}
+
+// XXX TODO
+void
+riscv_timer_start()
+{
+#if 0
+struct eventtimer *et, sbintime_t first, sbintime_t period)
+
+	uint64_t counts;
+
+	if (first != 0) {
+		counts = ((uint32_t)et->et_frequency * first) >> 32;
+		sbi_set_timer(get_cycles() + counts);
+		csr_set(sie, SIE_STIE);
+
+		return (0);
+	}
+
+	return (EINVAL);
+#endif
+
+}
+
+int
+riscv_timer_get_timebase()
+{
+	int node, len;
+
+	node = OF_finddevice("/cpus");
+	if (node == -1) {
+		printf("Can't find cpus node.\n");
+		return (0);
+	}
+
+	len = OF_getproplen(node, "timebase-frequency");
+	if (len != 4) {
+		printf("Can't find timebase-frequency property.\n");
+		return (0);
+	}
+
+	return OF_getpropint(node, "timebase-frequency", 0);
+}
+
+// XXX TODO
+void
+riscv_timer_delay(u_int usec)
+{
+#if 0
 	int64_t counts, counts_per_usec;
 	uint64_t first, last;
 
@@ -340,46 +316,5 @@ DELAY(int usec)
 		first = last;
 	}
 	TSEXIT();
-}
 #endif
-
-#if 0 //XXX moved out from intr.c
-void riscv_dflt_delay(u_int usecs);
-
-struct {
-	void	(*delay)(u_int);
-	void	(*initclocks)(void);
-	void	(*setstatclockrate)(int);
-	void	(*mpstartclock)(void);
-} riscv_clock_func = {
-	riscv_dflt_delay,
-	NULL,
-	NULL,
-	NULL
-};
-
-void
-riscv_clock_register(void (*initclock)(void), void (*delay)(u_int),
-    void (*statclock)(int), void(*mpstartclock)(void))
-{
-	if (riscv_clock_func.initclocks)
-		return;
-
-	riscv_clock_func.initclocks = initclock;
-	riscv_clock_func.delay = delay;
-	riscv_clock_func.setstatclockrate = statclock;
-	riscv_clock_func.mpstartclock = mpstartclock;
 }
-
-void
-riscv_dflt_delay(u_int usecs)
-{
-	int j;
-	/* BAH - there is no good way to make this close */
-	/* but this isn't supposed to be used after the real clock attaches */
-	for (; usecs > 0; usecs--)
-		for (j = 100; j > 0; j--)
-			;
-
-}
-#endif

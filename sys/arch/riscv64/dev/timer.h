@@ -28,7 +28,5 @@
 #define	_MACHINE_TIMER_H_
 
 int 	riscv_timer_match(struct device *, void *, void *);
-void 	riscv_clock_register(void (*)(void), void (*)(u_int), void (*)(int),
-    void (*)(void));
 
 #endif	/* _MACHINE_TIMER_H_ */
