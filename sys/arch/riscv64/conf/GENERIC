@@ -27,7 +27,7 @@ cpu0		at mainbus0
 #intc0		at cpu0
 
 simplebus*	at fdt? early 1
-timer*		at fdt? early 1
+timer*		at cpu? early 1
 
 scsibus*        at scsi?
 

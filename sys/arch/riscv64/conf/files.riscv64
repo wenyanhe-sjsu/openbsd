@@ -48,19 +48,19 @@ attach	mainbus at root
 file	arch/riscv64/dev/mainbus.c		mainbus
 
 #
+# cpu
+#
+define	cpu {[early = 1]}
+device	cpu
+attach	cpu at mainbus
+file	arch/riscv64/riscv64/cpu.c		cpu
+
+#
 # timer
 #
 device	timer
-attach	timer at fdt
+attach	timer at cpu
 file	arch/riscv64/dev/timer.c
-
-#
-# cpu
-#
-define	cpu {}
-device	cpu
-attach	cpu at mainbus
-file	arch/riscv64/riscv64/cpu.c
 
 #
 # overall interrupt controller
