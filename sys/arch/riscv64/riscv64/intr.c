@@ -59,7 +59,7 @@ riscv_cpu_intr(void *frame)
 	struct cpu_info	*ci = curcpu();
 
 	ci->ci_idepth++;
-	intc_irq_handler(frame);
+	riscv_intc_irq_handler(frame);
 	ci->ci_idepth--;
 }
 
