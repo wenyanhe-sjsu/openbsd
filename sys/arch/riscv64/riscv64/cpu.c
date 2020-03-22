@@ -263,7 +263,7 @@ cpu_identify(struct cpu_info *ci)
 
 	/* Print details for boot CPU */
 	if (cpu == 0) {
-		printf(": cpu%d: %s %s %s", cpu,
+		printf(": cpu%d: %s %s %s\n", cpu,
 		    cpu_desc[cpu].cpu_impl_name,
 		    cpu_desc[cpu].cpu_part_name,
 		    isa);
@@ -299,8 +299,8 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 
 	KASSERT(faa->fa_nreg > 0);
 
-#ifdef MULTIPROCESSOR
 	ci = malloc(sizeof(*ci), M_DEVBUF, M_WAITOK | M_ZERO);
+#ifdef MULTIPROCESSOR
 	cpu_info[dev->dv_unit] = ci;
 	ci->ci_next = cpu_info_list->ci_next;
 	cpu_info_list->ci_next = ci;
