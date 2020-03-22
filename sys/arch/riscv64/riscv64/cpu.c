@@ -30,6 +30,7 @@
 #include <machine/cpufunc.h>
 #include <machine/riscvreg.h>
 #include "../dev/riscv_cpu_intc.h"
+#include "../dev/timer.h"
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_clock.h>
@@ -354,6 +355,9 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 			cpu_node = ci->ci_node;
 			cpu_cpuspeed = cpu_clockspeed;
 		}
+
+		/* attach timer under cpu */
+		config_found_sm(dev, NULL, NULL, riscv_timer_match);
 
 		/* initialize the cpu's interrupt controller */
 		if (intc_init(ci->ci_node) > 0)
