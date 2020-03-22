@@ -32,6 +32,7 @@ file	arch/riscv64/riscv64/softintr.c
 file	arch/riscv64/riscv64/support.S
 file	arch/riscv64/riscv64/pagezero.S
 file	arch/riscv64/riscv64/trap.c
+file	arch/riscv64/riscv64/sbi.c
 
 file	arch/riscv64/riscv64/db_disasm.c	ddb
 file	arch/riscv64/riscv64/db_interface.c	ddb
