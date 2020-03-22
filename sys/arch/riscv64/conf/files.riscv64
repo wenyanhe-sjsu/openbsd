@@ -50,7 +50,7 @@ file	arch/riscv64/dev/mainbus.c		mainbus
 #
 # cpu
 #
-define	cpu {[early = 1]}
+define	cpu {}
 device	cpu
 attach	cpu at mainbus
 file	arch/riscv64/riscv64/cpu.c		cpu
@@ -65,8 +65,8 @@ file	arch/riscv64/dev/timer.c
 #
 # overall interrupt controller
 #
-#device	intc
-#attach	intc at cpu
+device	intc
+attach	intc at cpu
 file	arch/riscv64/dev/riscv_cpu_intc.c
 
 # Paravirtual device bus and virtio
