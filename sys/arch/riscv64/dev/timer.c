@@ -47,13 +47,6 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/timetc.h>
-#if 0
-#include <sys/bus.h>
-#include <sys/module.h>
-#include <sys/rman.h>
-#include <sys/timeet.h>
-#include <sys/watchdog.h>
-#endif
 
 #include <sys/proc.h>
 
@@ -67,20 +60,30 @@
 #include <machine/sbi.h>
 #include "riscv_cpu_intc.h"
 
-#if 0
-#include <dev/fdt/fdt_common.h>
-#include <dev/ofw/ofw_bus.h>
-#include <dev/ofw/ofw_bus_subr.h>
-#endif
 #include <dev/ofw/openfirm.h>
 
 #define	TIMER_COUNTS		0x00
 #define	TIMER_MTIMECMP(cpu)	(cpu * 8)
 
+struct riscv_timer_pcpu_softc {
+	uint64_t 		pc_nexttickevent;
+	uint64_t 		pc_nextstatevent;
+	u_int32_t		pc_ticks_err_sum;
+};
+
 struct riscv_timer_softc {
 	struct device		 sc_dev;
+	int			 sc_node;
+
+	struct riscv_timer_pcpu_softc sc_pstat[MAXCPUS];
+
+	u_int32_t		sc_ticks_err_cnt;
+	u_int32_t		sc_ticks_per_second; // sc_clkfreq
+	u_int32_t		sc_ticks_per_intr;
+	u_int32_t		sc_statvar;
+	u_int32_t		sc_statmin;
+
 	void			*sc_ih;
-	uint32_t		 sc_clkfreq;
 };
 
 static struct riscv_timer_softc *riscv_timer_sc = NULL;
@@ -147,9 +150,9 @@ riscv_timer_attach(struct device *parent, struct device *self, void *aux)
 		return (ENXIO);
 #endif
 
-	sc->sc_clkfreq = riscv_timer_get_timebase();
-	if (sc->sc_clkfreq == 0) {
-		printf("No clock frequency specified\n");
+	sc->sc_ticks_per_second = riscv_timer_get_timebase();
+	if (sc->sc_ticks_per_second == 0) {
+		printf("Failed to resolve RISC-V Timer timebase\n");
 		return;
 	}
 
@@ -162,7 +165,7 @@ riscv_timer_attach(struct device *parent, struct device *self, void *aux)
 	riscv_clock_register(riscv_timer_initclocks, riscv_timer_delay,
 	    riscv_timer_setstatclockrate, riscv_timer_start);
 
-	riscv_timer_timecount.tc_frequency = sc->sc_clkfreq;
+	riscv_timer_timecount.tc_frequency = sc->sc_ticks_per_second;
 	riscv_timer_timecount.tc_priv = sc;
 	tc_init(&riscv_timer_timecount);
 }
@@ -170,36 +173,34 @@ riscv_timer_attach(struct device *parent, struct device *self, void *aux)
 int
 riscv_timer_intr(void *arg)
 {
-#if 0
 	struct riscv_timer_softc *sc;
-
+#ifdef	DEBUG_TIMER
+	printf("RISC-V Timer Interrupt\n");
+#endif
 	sc = (struct riscv_timer_softc *)arg;
 
 	csr_clear(sip, SIP_STIP);
 
+#if 0	// Not relevant? FreeBSD specific?
 	if (sc->et.et_active)
 		sc->et.et_event_cb(&sc->et, sc->et.et_arg);
-
-	return (FILTER_HANDLED);
 #endif
-	return 0;
+
+	return (0); // Handled
 }
 
-#if 0
-inline uint64_t
-get_cycles(void)
+static inline uint64_t
+get_cycles()
 {
 	return (rdtime());
 }
-#endif
 
 long
 get_counts(struct riscv_timer_softc *sc)
 {
 	uint64_t counts;
 
-	//counts = get_cycles(); // XXX Figure error with inline get_cycles()?
-	counts = rdtime();
+	counts = get_cycles();
 
 	return (counts);
 }
@@ -217,8 +218,39 @@ riscv_timer_get_timecount(struct timecounter *tc)
 void
 riscv_timer_initclocks()
 {
+	struct riscv_timer_softc	*sc = timer_cd.cd_devs[0];
+	struct riscv_timer_pcpu_softc	*pc =
+		&sc->sc_pstat[CPU_INFO_UNIT(curcpu())];
+	uint64_t			 next;
 
-// XXX TODO
+	stathz = hz;
+	profhz = hz * 10;
+
+#if 0	// XXX Not necessary? RISC-V timer always runs at constant frequency
+	if (sc->sc_clkfreq != riscv_timer_frequency) {
+		riscv_timer_set_clockrate(agtimer_frequency);
+	}
+#endif
+
+	riscv_timer_setstatclockrate(stathz);
+
+	sc->sc_ticks_per_intr = sc->sc_ticks_per_second / hz;
+	sc->sc_ticks_err_cnt = sc->sc_ticks_per_second % hz;
+	pc->pc_ticks_err_sum = 0;
+
+	/* configure virtual timer interupt */
+	sc->sc_ih = riscv_intr_establish_fdt_idx(sc->sc_node, 2,
+	    IPL_CLOCK|IPL_MPSAFE, riscv_timer_intr, NULL, "tick");
+
+	next = get_cycles() + sc->sc_ticks_per_intr;
+	pc->pc_nexttickevent = pc->pc_nextstatevent = next;
+
+	sbi_set_timer(next);
+	csr_set(sie, SIE_STIE);
+	// Supervisor Interrupt Enabled is OFF at this point
+	// Can set SSTATUS_SIE to ON below to supervisor timer interrupt loop
+	// XXX Figure out where to enable Supervisor Interrupts
+	// csr_set(sstatus, SSTATUS_SIE);
 }
 
 void
@@ -228,26 +260,21 @@ riscv_timer_setstatclockrate(int newhz)
 // XXX TODO
 }
 
-// XXX TODO
 void
 riscv_timer_start()
 {
-#if 0
-struct eventtimer *et, sbintime_t first, sbintime_t period)
+	struct riscv_timer_softc	*sc = timer_cd.cd_devs[0];
+	struct riscv_timer_pcpu_softc	*pc =
+		&sc->sc_pstat[CPU_INFO_UNIT(curcpu())];
+	uint64_t nextevent;
 
-	uint64_t counts;
+	nextevent = get_cycles() + sc->sc_ticks_per_intr;
+	pc->pc_nexttickevent = pc->pc_nextstatevent = nextevent;
 
-	if (first != 0) {
-		counts = ((uint32_t)et->et_frequency * first) >> 32;
-		sbi_set_timer(get_cycles() + counts);
-		csr_set(sie, SIE_STIE);
+	riscv_intr_route(sc->sc_ih, 1, curcpu());
 
-		return (0);
-	}
-
-	return (EINVAL);
-#endif
-
+	sbi_set_timer(nextevent);
+	csr_set(sie, SIE_STIE);
 }
 
 int
@@ -274,7 +301,6 @@ riscv_timer_get_timebase()
 void
 riscv_timer_delay(u_int usec)
 {
-#if 0
 	int64_t counts, counts_per_usec;
 	uint64_t first, last;
 
@@ -292,7 +318,10 @@ riscv_timer_delay(u_int usec)
 				cpufunc_nullop();
 		return;
 	}
+
+#if 0	// XXX FreeBSD Specific?
 	TSENTER();
+#endif
 
 	/* Get the number of times to count */
 	counts_per_usec = ((riscv_timer_timecount.tc_frequency / 1000000) + 1);
@@ -315,6 +344,8 @@ riscv_timer_delay(u_int usec)
 		counts -= (int64_t)(last - first);
 		first = last;
 	}
+
+#if 0	// FreeBSD Specific?
 	TSEXIT();
 #endif
 }
