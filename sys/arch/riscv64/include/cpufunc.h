@@ -101,5 +101,9 @@ load_satp(uint64_t val)
 	__asm __volatile("csrw satp, %0" :: "r"(val));
 }
 
+#define	cpufunc_nullop()		riscv_nullop()
+
+void riscv_nullop(void);
+
 #endif	/* _KERNEL */
 #endif	/* _MACHINE_CPUFUNC_H_ */
