@@ -203,10 +203,13 @@ riscv_intr_register_fdt(struct interrupt_controller *ic)
 			continue;
 
 		ip->ip_ic = ic;
-		ip->ip_ih = ic->ic_establish(ic->ic_cookie, ip->ip_cell,
-		    ip->ip_level, ip->ip_func, ip->ip_arg, ip->ip_name);
-		if (ip->ip_ih == NULL)
-			printf("can't establish interrupt %s\n", ip->ip_name);
+		if (ic->ic_establish)/* riscv_cpu_intc sets this to NULL */
+		{
+			ip->ip_ih = ic->ic_establish(ic->ic_cookie, ip->ip_cell,
+					ip->ip_level, ip->ip_func, ip->ip_arg, ip->ip_name);
+			if (ip->ip_ih == NULL)
+				printf("can't establish interrupt %s\n", ip->ip_name);
+		}
 
 		LIST_REMOVE(ip, ip_list);
 	}
