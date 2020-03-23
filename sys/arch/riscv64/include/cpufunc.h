@@ -39,6 +39,10 @@ breakpoint(void)
 
 #include <machine/riscvreg.h>
 
+#define	rdcycle()			csr_read(cycle)
+#define	rdtime()			csr_read(time)
+#define	rdinstret()			csr_read(instret)
+#define	rdhpmcounter(n)			csr_read(hpmcounter##n)
 
 static __inline void
 fence_i(void)

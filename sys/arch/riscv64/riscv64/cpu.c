@@ -29,6 +29,7 @@
 #include <machine/elf.h>
 #include <machine/cpufunc.h>
 #include <machine/riscvreg.h>
+#include "../dev/timer.h"
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_clock.h>
@@ -297,8 +298,8 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 
 	KASSERT(faa->fa_nreg > 0);
 
-#ifdef MULTIPROCESSOR
 	ci = malloc(sizeof(*ci), M_DEVBUF, M_WAITOK | M_ZERO);
+#ifdef MULTIPROCESSOR
 	cpu_info[dev->dv_unit] = ci;
 	ci->ci_next = cpu_info_list->ci_next;
 	cpu_info_list->ci_next = ci;
@@ -354,17 +355,32 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 			cpu_cpuspeed = cpu_clockspeed;
 		}
 
-#if 0// XXX CMPE
-		/* Initialize debug registers. */
-		WRITE_SPECIALREG(mdscr_el1, DBG_MDSCR_TDCC);
-		WRITE_SPECIALREG(oslar_el1, 0);
-#endif
+		/*
+		 * attach cpu-embedded timer
+		 * Trick: timer has no fdt node to match,
+		 * riscv_timer_match will always return 1 at first call,
+		 * and return 0 for all following calls,
+		 * therefore, must attach timer before any node
+		 */
+		config_found_sm(dev, NULL, NULL, riscv_timer_match);
+		printf("\n");
+
+		/*
+		 * attach cpu's children node, so far there is only the
+		 * cpu-embedded interrupt controller
+		 */
+		struct fdt_attach_args	 fa_intc;
+		int node;
+		for (node = OF_child(faa->fa_node); node; node = OF_peer(node)) {
+			fa_intc.fa_node = node;
+			/* no specifying match func, will call cfdata's match func*/
+			config_found(dev, &fa_intc, NULL);
+			printf("\n");
+		}
 
 #ifdef MULTIPROCESSOR
 	}
 #endif
-
-	printf("\n");
 }
 
 int
