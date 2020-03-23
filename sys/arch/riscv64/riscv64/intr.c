@@ -23,7 +23,7 @@
 #include <machine/cpu.h>
 #include <machine/intr.h>
 #include <machine/frame.h>
-#include "../dev/riscv_cpu_intc.h"
+#include "riscv64/dev/riscv_cpu_intc.h"
 
 #include <dev/ofw/openfirm.h>
 
@@ -203,10 +203,13 @@ riscv_intr_register_fdt(struct interrupt_controller *ic)
 			continue;
 
 		ip->ip_ic = ic;
-		ip->ip_ih = ic->ic_establish(ic->ic_cookie, ip->ip_cell,
-		    ip->ip_level, ip->ip_func, ip->ip_arg, ip->ip_name);
-		if (ip->ip_ih == NULL)
-			printf("can't establish interrupt %s\n", ip->ip_name);
+		if (ic->ic_establish)/* riscv_cpu_intc sets this to NULL */
+		{
+			ip->ip_ih = ic->ic_establish(ic->ic_cookie, ip->ip_cell,
+					ip->ip_level, ip->ip_func, ip->ip_arg, ip->ip_name);
+			if (ip->ip_ih == NULL)
+				printf("can't establish interrupt %s\n", ip->ip_name);
+		}
 
 		LIST_REMOVE(ip, ip_list);
 	}
@@ -510,6 +513,82 @@ riscv_splassert_check(int wantipl, const char *func)
 	}
 }
 #endif
+
+/*
+ ********* timer interrupt relevant **************
+ */
+
+void riscv_dflt_delay(u_int usecs);
+
+struct {
+	void	(*delay)(u_int);
+	void	(*initclocks)(void);
+	void	(*setstatclockrate)(int);
+	void	(*mpstartclock)(void);
+} riscv_clock_func = {
+	riscv_dflt_delay,
+	NULL,
+	NULL,
+	NULL
+};
+
+void
+riscv_clock_register(void (*initclock)(void), void (*delay)(u_int),
+    void (*statclock)(int), void(*mpstartclock)(void))
+{
+	if (riscv_clock_func.initclocks)
+		return;
+
+	riscv_clock_func.initclocks = initclock;
+	riscv_clock_func.delay = delay;
+	riscv_clock_func.setstatclockrate = statclock;
+	riscv_clock_func.mpstartclock = mpstartclock;
+}
+
+void
+delay(u_int usec)
+{
+	riscv_clock_func.delay(usec);
+}
+
+void
+cpu_initclocks(void)
+{
+	if (riscv_clock_func.initclocks == NULL)
+		panic("initclocks function not initialized yet");
+
+	riscv_clock_func.initclocks();
+}
+
+void
+cpu_startclock(void)
+{
+	if (riscv_clock_func.mpstartclock == NULL)
+		panic("startclock function not initialized yet");
+
+	riscv_clock_func.mpstartclock();
+}
+
+void
+riscv_dflt_delay(u_int usecs)
+{
+	int j;
+	/* BAH - there is no good way to make this close */
+	/* but this isn't supposed to be used after the real clock attaches */
+	for (; usecs > 0; usecs--)
+		for (j = 100; j > 0; j--)
+			;
+}
+
+void
+setstatclockrate(int new)
+{
+	if (riscv_clock_func.setstatclockrate == NULL) {
+		panic("riscv_clock_func.setstatclockrate not intialized");
+	}
+	riscv_clock_func.setstatclockrate(new);
+}
+
 void
 intr_barrier(void *ih)
 {

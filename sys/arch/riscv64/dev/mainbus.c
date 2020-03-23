@@ -91,7 +91,7 @@ mainbus_match(struct device *parent, void *cfdata, void *aux)
 }
 
 extern char *hw_prod;
-void agtimer_init(void);
+void riscv_timer_init(void);
 
 void
 mainbus_attach(struct device *parent, struct device *self, void *aux)
@@ -101,9 +101,8 @@ mainbus_attach(struct device *parent, struct device *self, void *aux)
 	int node, len;
 
 	riscv_intr_init_fdt();
-#if 0
-	agtimer_init();
-#endif
+	riscv_timer_init();
+
 	sc->sc_node = OF_peer(0);
 	sc->sc_iot = &riscv64_bs_tag;
 	sc->sc_dmat = &mainbus_dma_tag;

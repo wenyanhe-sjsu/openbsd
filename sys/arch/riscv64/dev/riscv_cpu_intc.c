@@ -67,9 +67,18 @@ riscv_intc_attach(struct device *parent, struct device *self, void *aux)
 
 	intc_ic.ic_node = faa->fa_node;
 	intc_ic.ic_cookie = &intc_ic;
-	intc_ic.ic_establish = riscv_intc_intr_establish_fdt;
-	intc_ic.ic_disestablish = riscv_intc_intr_disestablish;
+
+	/*
+	 * only allow install/uninstall handler to/from global vector
+	 * by calling riscv_intc_intr_establish/disestablish
+	 */
+	intc_ic.ic_establish = NULL;
+	intc_ic.ic_disestablish = NULL;
+
 	riscv_intr_register_fdt(&intc_ic);
+
+	/* XXX right time to enable interrupts ?? */
+	enable_interrupts();
 }
 
 void
@@ -117,13 +126,6 @@ riscv_intc_intr_establish(int irqno, int dummy_level, int (*func)(void *),
 #endif
 	restore_interrupts(psw);
 	return (ih);
-}
-
-void *
-riscv_intc_intr_establish_fdt(void *cookie, int *cell, int dummy_level,
-		int (*func)(void *), void *arg, char *name)
-{
-	return riscv_intc_intr_establish(cell[0], 0, func, arg, name);
 }
 
 void
