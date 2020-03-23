@@ -70,6 +70,9 @@ riscv_intc_attach(struct device *parent, struct device *self, void *aux)
 	intc_ic.ic_establish = riscv_intc_intr_establish_fdt;
 	intc_ic.ic_disestablish = riscv_intc_intr_disestablish;
 	riscv_intr_register_fdt(&intc_ic);
+
+	/* XXX right time to enable interrupts ?? */
+	enable_interrupts();
 }
 
 void
