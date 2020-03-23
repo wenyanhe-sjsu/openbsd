@@ -13,7 +13,9 @@ maxusers	32
 
 makeoptions	KERNEL_BASE_PHYS="0x00200000"
 makeoptions	KERNEL_BASE_VIRT="0xffffffc000200000"
-#option		DEBUG
+option		DEBUG
+option		DEBUG_AUTOCONF
+option		DEBUG_INTC
 
 config	bsd	swap generic
 
@@ -22,14 +24,18 @@ config	bsd	swap generic
 #
 mainbus0	at root
 cpu0		at mainbus0
+timer*		at cpu0
+intc*		at cpu0
+
+simplebus*	at mainbus0 early 1
 
 scsibus*        at scsi?
 
 # NS16550 compatible serial ports
-com*		at fdt?
+com*		at fdt? early 1
 
 # Platform Level Interrupt Controller
-plic*		at fdt?
+plic*		at simplebus? early 1
 
 virtio*		at fdt?
 #vio*		at virtio?	# Network

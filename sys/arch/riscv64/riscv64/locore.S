@@ -400,7 +400,7 @@ mpva:
 .option pop
 
 	/* Setup supervisor trap vector */
-	la	t0, cpu_exception_handler	//XXX defined in freebsd/machine/excpetion.S
+	la	t0, cpu_exception_handler
 	csrw	stvec, t0
 
 	/* Ensure sscratch is zero */

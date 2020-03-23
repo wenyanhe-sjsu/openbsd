@@ -75,14 +75,40 @@
 #define	IST_EDGE_RISING		5
 #define	IST_EDGE_BOTH		6
 
+/* RISCV interrupt mcause, from freebsd */
+#define	RISCV_NIRQ		1024
+
+#ifndef	NIRQ
+#define	NIRQ			RISCV_NIRQ
+#endif
+
+enum {
+	IRQ_SOFTWARE_USER,
+	IRQ_SOFTWARE_SUPERVISOR,
+	IRQ_SOFTWARE_HYPERVISOR,
+	IRQ_SOFTWARE_MACHINE,
+	IRQ_TIMER_USER,
+	IRQ_TIMER_SUPERVISOR,
+	IRQ_TIMER_HYPERVISOR,
+	IRQ_TIMER_MACHINE,
+	IRQ_EXTERNAL_USER,
+	IRQ_EXTERNAL_SUPERVISOR,
+	IRQ_EXTERNAL_HYPERVISOR,
+	IRQ_EXTERNAL_MACHINE,
+	INTC_NIRQS
+};
+
 #ifndef _LOCORE
 #include <sys/device.h>
 #include <sys/queue.h>
+
+#include <machine/frame.h>
 
 int	 splraise(int);
 int	 spllower(int);
 void	 splx(int);
 
+void	 riscv_cpu_intr(void *);
 void	 riscv_do_pending_intr(int);
 void	 riscv_set_intr_handler(int (*raise)(int), int (*lower)(int),
     void (*x)(int), void (*setipl)(int),
@@ -158,19 +184,13 @@ extern uint32_t riscv_smask[NIPL];
 
 #include <machine/softintr.h>
 
-/* XXX - this is probably the wrong location for this */
-void riscv_clock_register(void (*)(void), void (*)(u_int), void (*)(int),
-    void (*)(void));
-
+/***** interrupt controller structure and routines *****/
 struct cpu_info;
-
 struct interrupt_controller {
 	int	ic_node;
 	void	*ic_cookie;
 	void	*(*ic_establish)(void *, int *, int, int (*)(void *),
 		    void *, char *);
-	void	*(*ic_establish_msi)(void *, uint64_t *, uint64_t *, int,
-		    int (*)(void *), void *, char *);
 	void	 (*ic_disestablish)(void *);
 	void	 (*ic_enable)(void *);
 	void	 (*ic_disable)(void *);
@@ -188,18 +208,11 @@ void	*riscv_intr_establish_fdt(int, int, int (*)(void *),
 	    void *, char *);
 void	*riscv_intr_establish_fdt_idx(int, int, int, int (*)(void *),
 	    void *, char *);
-void	*riscv_intr_establish_fdt_imap(int, int *, int, int, int (*)(void *),
-	    void *, char *);
-void	*riscv_intr_establish_fdt_msi(int, uint64_t *, uint64_t *, int ,
-	    int (*)(void *), void *, char *);
 void	 riscv_intr_disestablish_fdt(void *);
 void	 riscv_intr_enable(void *);
 void	 riscv_intr_disable(void *);
 void	 riscv_intr_route(void *, int, struct cpu_info *);
 void	 riscv_intr_cpu_enable(void);
-void	*riscv_intr_parent_establish_fdt(void *, int *, int,
-	    int (*)(void *), void *, char *);
-void	 riscv_intr_parent_disestablish_fdt(void *);
 
 void	 riscv_send_ipi(struct cpu_info *, int);
 extern void (*intr_send_ipi_func)(struct cpu_info *, int);
