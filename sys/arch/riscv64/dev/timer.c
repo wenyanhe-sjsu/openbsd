@@ -207,10 +207,16 @@ int
 riscv_timer_intr(void *arg)
 {
 	struct riscv_timer_softc *sc;
+	uint64_t next;
+	u_int new_hz = 1000;
+
 #ifdef	DEBUG_TIMER
 	printf("RISC-V Timer Interrupt\n");
 #endif
 	sc = (struct riscv_timer_softc *)arg;
+
+	next = get_cycles() + sc->sc_ticks_per_second / new_hz;
+	sbi_set_timer(next);
 
 	csr_clear(sip, SIP_STIP);
 
