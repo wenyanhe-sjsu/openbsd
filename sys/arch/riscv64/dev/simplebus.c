@@ -232,7 +232,7 @@ simplebus_attach_node(struct device *self, int node)
 		fa.fa_dmat->_flags |= BUS_DMA_COHERENT;
 	}
 
-#ifdef DEBUG
+#ifdef DEBUG_AUTOCONF
 	if (OF_getprop(fa.fa_node, "name", buf, sizeof(buf)) > 0)
 		printf("\ncurrent parent: %s, current node: %d-%s\n", self->dv_xname, fa.fa_node, buf);
 #endif

@@ -42,6 +42,7 @@
 #include <machine/bootconfig.h>
 #include <machine/bus.h>
 #include <machine/riscv64var.h>
+#include <machine/sbi.h>
 
 #include <machine/db_machdep.h>
 #include <ddb/db_extern.h>
@@ -619,6 +620,7 @@ initriscv(struct riscv_bootparams *rbp)
 	 */
 	__asm __volatile("mv tp, %0" :: "r"(pcpup));
 
+	sbi_init();
 	cache_setup();//dummy for now
 
 	process_kernel_args();

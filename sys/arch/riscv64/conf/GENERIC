@@ -16,6 +16,7 @@ makeoptions	KERNEL_BASE_VIRT="0xffffffc000200000"
 option		DEBUG
 option		DEBUG_AUTOCONF
 option		DEBUG_INTC
+option		DEBUG_TIMER
 
 config	bsd	swap generic
 
