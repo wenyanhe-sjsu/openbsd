@@ -300,6 +300,7 @@ riscv_timer_setstatclockrate(int newhz)
 	/* dummy: clockrate on riscv is fixed*/
 }
 
+/* is only called from secondary cpu */
 void
 riscv_timer_startclock()
 {
