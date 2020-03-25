@@ -68,8 +68,13 @@ do_trap_supervisor(struct trapframe *frame)
 		return;
 		break;
 	case EXCP_BREAKPOINT:
-		/* XXX sepc == program counter? */
+#ifdef DDB
+		/*
+		 * XXX sepc == program counter? and XXX copied over from
+		 * arm64 arch.
+		 */
                 db_trapper(frame->tf_sepc,0/*XXX*/, frame, exception);         
+#endif
 		break;
         }                        
 
