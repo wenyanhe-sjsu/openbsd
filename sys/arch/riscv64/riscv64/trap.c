@@ -60,14 +60,21 @@ do_trap_supervisor(struct trapframe *frame)
 	KASSERTMSG((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
 	    SSTATUS_SPP, "Came from S mode with interrupts enabled");
 
-	if (frame->tf_scause & EXCP_INTR) {
+	exception = (frame->tf_scause & EXCP_MASK);
+	switch (exception) {
+	case EXCP_INTR:
 		/* Interrupt */
 		riscv_cpu_intr(frame);
 		return;
-	}
+		break;
+	case EXCP_BREAKPOINT:
+		/* XXX sepc == program counter? */
+                db_trapper(frame->tf_sepc,0/*XXX*/, frame, exception);         
+		break;
+        }                        
+
 
 //XXX TODO: just panic for now
-	exception = (frame->tf_scause & EXCP_MASK);
 	dump_regs(frame);
 	panic("Unknown kernel exception %x trap value %lx\n",
 	    exception, frame->tf_stval);
