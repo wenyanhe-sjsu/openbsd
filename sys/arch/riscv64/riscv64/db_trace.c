@@ -98,6 +98,7 @@ db_stack_trace_print(db_expr_t addr, int have_addr, db_expr_t count,
 		lastra = ra;
 		db_read_bytes(frame - 8, sizeof(vaddr_t), (char *)&ra);
 
+#if 0
 		if (name != NULL) {
 			if ((strcmp (name, "handle_el0_irq") == 0) ||
 			    (strcmp (name, "handle_el1_irq") == 0)) {
@@ -108,6 +109,7 @@ db_stack_trace_print(db_expr_t addr, int have_addr, db_expr_t count,
 				(*pr)("--- trap ---\n");
 			}
 		}
+#endif
 		if (INKERNEL(frame)) {
 			if (frame <= lastframe) {
 				(*pr)("Bad frame pointer: 0x%lx\n", frame);
