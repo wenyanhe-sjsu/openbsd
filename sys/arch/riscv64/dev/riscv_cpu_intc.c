@@ -81,6 +81,38 @@ riscv_intc_attach(struct device *parent, struct device *self, void *aux)
 	enable_interrupts();
 }
 
+/******** overall spl* routine ********/
+void
+riscv_intc_calc_mask(void)
+{
+
+}
+
+void
+riscv_intc_splx(int new)
+{
+	struct cpu_info *ci = curcpu();
+
+	if (ci->ci_ipending & riscv_smask[new])
+		riscv_do_pending_intr(new);
+
+	riscv_intc_setipl(new);
+
+	/* deliver newx to plic too ?? */
+	plic_splx(new);
+}
+
+int
+riscv_intc_spllower(int new)
+{
+	struct cpu_info *ci = curcpu();
+	int old = ci->ci_cpl;
+	riscv_intc_splx(new);
+	return (old);
+}
+
+
+/* global interrupt handler */
 void
 riscv_intc_irq_handler(void *frame)
 {
