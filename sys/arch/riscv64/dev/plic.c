@@ -115,6 +115,9 @@ plic_match(struct device *parent, void *cfdata, void *aux)
 {
 	struct fdt_attach_args *faa = aux;
 
+	if (plic_attached)
+		return 0; // Only expect one instance of PLIC
+
 	return (OF_is_compatible(faa->fa_node, "riscv,plic0") ||
 		OF_is_compatible(faa->fa_node, "sifive,plic-1.0.0"));
 }
@@ -125,7 +128,15 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	struct plic_irqsrc *isrcs;
 	struct plic_softc *sc;
 	struct fdt_attach_args *faa;
+	uint32_t* intr;
 	uint32_t irq;
+	uint32_t cpu;
+	int node;
+	int len;
+	int nintr;
+	int context;
+	int i;
+	int hart;
 
 	sc = (struct plic_softc *)dev;
 	faa = (struct fdt_attach_args *)aux;
@@ -135,7 +146,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 
 	plic = sc;
 
-	sc->sc_node = faa->fa_node;
+	sc->sc_node = node = faa->fa_node;
 	sc->sc_iot = faa->fa_iot;
 
 	/* determine number of devices sending intr to this ic */
@@ -183,6 +194,69 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 #if 0	// XXX Irrelevant ???
 	plic_calc_mask();
 #endif
+
+	/*
+	 * Calculate the per-cpu enable and context register offsets.
+	 *
+	 * This is tricky for a few reasons. The PLIC divides the interrupt
+	 * enable, threshold, and claim bits by "context", where each context
+	 * routes to a Core-Local Interrupt Controller (CLIC).
+	 *
+	 * The tricky part is that the PLIC spec imposes no restrictions on how
+	 * these contexts are laid out. So for example, there is no guarantee
+	 * that each CPU will have both a machine mode and supervisor context,
+	 * or that different PLIC implementations will organize the context
+	 * registers in the same way. On top of this, we must handle the fact
+	 * that cpuid != hartid, as they may have been renumbered during boot.
+	 * We perform the following steps:
+	 *
+	 * 1. Examine the PLIC's "interrupts-extended" property and skip any
+	 *    entries that are not for supervisor external interrupts.
+	 *
+	 * 2. Walk up the device tree to find the corresponding CPU, and grab
+	 *    it's hart ID.
+	 *
+	 * 3. Convert the hart to a cpuid, and calculate the register offsets
+	 *    based on the context number.
+	 */
+	len = OF_getproplen(node, "interrupts-extended");
+	if (len <= 0) {
+		printf(": unable to read interrupts-extended\n");
+		return;
+	}
+
+	intr = malloc(len, M_TEMP, M_WAITOK);
+	nintr = len / sizeof(*intr);
+
+	for (i = 0, context = 0; i < nintr; i += 2, context++) {
+		/* Skip M-mode external interrupts */
+		if (intr[i + 1] != IRQ_EXTERNAL_SUPERVISOR)
+			continue;
+
+		/* Get the hart ID from the CLIC's phandle. */
+		hart = -1; // XXX plic_get_hartid(dev, OF_node_from_xref(cells[i]));
+		if (hart < 0) {
+			printf(": failed to resolve hart from clic\n");
+			free(intr, M_TEMP, len);
+			return;
+		}
+
+		/* Get the corresponding cpuid. */
+		cpu = -1; // XXX riscv_hartid_to_cpu(hart);
+		if (cpu < 0) {
+			printf(": invalid hart!\n");
+			free(intr, M_TEMP, len);
+			return;
+		}
+
+		/* Set the enable and context register offsets for the CPU. */
+		sc->sc_contexts[cpu].enable_offset = PLIC_ENABLE_BASE +
+		    context * PLIC_ENABLE_STRIDE;
+		sc->sc_contexts[cpu].context_offset = PLIC_CONTEXT_BASE +
+		    context * PLIC_CONTEXT_STRIDE;
+	}
+
+	free(intr, M_TEMP, len);
 
 	plic_attached = 1;
 
