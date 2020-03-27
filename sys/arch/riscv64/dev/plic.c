@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020, Mars Li <mengshi.li.mars@gmail.com>
+ * Copyright (c) 2020, Brian Bamsch <bbamsch@google.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -59,7 +60,7 @@ struct intrhand {
 	char *ih_name;
 };
 
-struct intrsource {
+struct plic_irqsrc {
 	TAILQ_HEAD(, intrhand) is_list;	/* handler list */
 	int is_irq;			/* IRQ to mask while handling */
 };
@@ -71,10 +72,13 @@ struct plic_context {
 
 struct plic_softc {
 	struct device		sc_dev;
-	struct intrsource	sc_handler[PLIC_MAX_IRQS];
-	u_int32_t 		sc_imask[NIPL];
+	int			sc_node;
 	bus_space_tag_t		sc_iot;
 	bus_space_handle_t	sc_ioh;
+	struct plic_irqsrc	sc_isrcs[PLIC_MAX_IRQS];
+#if 0	// Masking is done via setting priority threshold?
+	u_int32_t 		sc_imask[NIPL];
+#endif
 	struct plic_context	sc_contexts[MAXCPUS];
 	int			sc_ndev;
 	struct interrupt_controller 	sc_intc;
@@ -118,42 +122,67 @@ plic_match(struct device *parent, void *cfdata, void *aux)
 void
 plic_attach(struct device *parent, struct device *dev, void *aux)
 {
-	struct plic_softc *sc = (struct plic_softc *) dev;
-	struct fdt_attach_args *faa = aux;
+	struct plic_irqsrc *isrcs;
+	struct plic_softc *sc;
+	struct fdt_attach_args *faa;
+	uint32_t irq;
+
+	sc = (struct plic_softc *)dev;
+	faa = (struct fdt_attach_args *)aux;
 
 	if (faa->fa_nreg < 1)
 		return;
 
 	plic = sc;
 
+	sc->sc_node = faa->fa_node;
 	sc->sc_iot = faa->fa_iot;
+
+	/* determine number of devices sending intr to this ic */
+	sc->sc_ndev = OF_getpropint(faa->fa_node, "riscv,ndev", -1);
+	if (sc->sc_ndev < 0) {
+		printf(": unable to resolve number of devices\n");
+		return;
+	}
+
+	if (sc->sc_ndev >= PLIC_MAX_IRQS) {
+		printf(": invalid ndev (%d)\n", sc->sc_ndev);
+		return;
+	}
 
 	/* map interrupt controller to va space */
 	if (bus_space_map(sc->sc_iot, faa->fa_reg[0].addr,
 	    faa->fa_reg[0].size, 0, &sc->sc_ioh))
 		panic("%s: bus_space_map failed!", __func__);
 
-	/* determine number of devices sending intr to this ic */
-	sc->sc_ndev = OF_getpropint(faa->fa_node, "riscv,ndev", 0);
-	if (sc->ndev >= PLIC_MAX_IRQS) {
-		printf(": invalid ndev (%d)\n", sc->ndev);
-		return;
-	}
-
-
-
-	/* mask all interrupts */
-	for (i = 0; i < INTC_NUM_BANKS; i++)
-		bus_space_write_4(plic_iot, plic_ioh, INTC_MIRn(i), 0xffffffff);
-
-	for (i = 0; i < INTC_NUM_IRQ; i++) {
-		bus_space_write_4(plic_iot, plic_ioh, INTC_ILRn(i),
+#if 0
+	for (i = 0; i < PLIC_MAX_IRQS; i++) {
+		bus_space_write_4(plic->sc_iot, plic->sc_ioh, INTC_ILRn(i),
 		    INTC_ILR_PRIs(INTC_MIN_PRI)|INTC_ILR_IRQ);
 
 		TAILQ_INIT(&plic_handler[i].iq_list);
 	}
+#endif
+	isrcs = sc->sc_isrcs;
+	for (irq = 1; irq <= sc->sc_ndev; irq++) {
+		isrcs[irq].is_irq = irq;
 
+		// Register Interrupt Source
+#if 0		// Example (from FreeBSD)
+		error = intr_isrc_register(&isrcs[irq].isrc, sc->dev,
+		    0, "%s,%u", name, irq);
+		if (error != 0)
+			return (error);
+#endif
+
+		// Mask interrupt
+		bus_space_write_4(plic->sc_iot, plic->sc_ioh,
+		    PLIC_PRIORITY(irq), 0);
+	}
+
+#if 0	// XXX Irrelevant ???
 	plic_calc_mask();
+#endif
 
 	plic_attached = 1;
 
@@ -187,6 +216,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 
 /*******************************************/
 
+#if 0
 void
 plic_calc_mask(void)
 {
@@ -228,12 +258,14 @@ plic_calc_mask(void)
 	}
 	plic_setipl(ci->ci_cpl);
 }
+#endif
+
 void
 plic_splx(int new)
 {
+#if 0	/* XXX how to do pending external interrupt ? */
 	struct cpu_info *ci = curcpu();
 
-#if 0	/* XXX how to do pending external interrupt ? */
 	if (ci->ci_ipending & arm_smask[ci->ci_cpl])
 		arm_do_pending_intr(ci->ci_cpl);// this seems to be software interrupt
 #endif
@@ -249,6 +281,9 @@ plic_spllower(int new)
 	int old = ci->ci_cpl;
 	plic_splx(new);
 	return (old);
+#else
+	panic("plic_spllower unimplemented");
+	return (new);
 #endif
 }
 
@@ -300,6 +335,7 @@ plic_setipl(int new)
 #endif
 }
 
+#if 0	// XXX From arm64/omap/intc.c. Necessary?
 void
 plic_intr_bootstrap(vaddr_t addr)
 {
@@ -311,6 +347,7 @@ plic_intr_bootstrap(vaddr_t addr)
 		for (j = 0; j < NIPL; j++)
 			plic_imask[i][j] = 0xffffffff;
 }
+#endif
 
 void
 plic_irq_handler(void *frame)
@@ -346,10 +383,21 @@ plic_irq_handler(void *frame)
 #endif
 }
 
+void
+plic_intr_route(void *cookie, int enable, struct cpu_info *ci)
+{
+	// XXX TODO
+	panic("plic_intr_route unimplemented");
+	return;
+}
+
 void *
 plic_intr_establish(int irqno, int level, int (*func)(void *),
     void *arg, char *name)
 {
+	panic("plic_intr_establish unimplemented");
+	return (0);
+#if 0
 	struct plic_softc *sc = plic;
 	struct intrhand *ih;
 	int psw;
@@ -386,6 +434,7 @@ plic_intr_establish(int irqno, int level, int (*func)(void *),
 #endif
 	restore_interrupts(psw);
 	return (ih);
+#endif
 }
 
 void *
@@ -404,7 +453,7 @@ plic_intr_disestablish(void *cookie)
 	int psw;
 
 	psw = disable_interrupts();
-	TAILQ_REMOVE(&sc->sc_handler[irqno].is_list, ih, ih_list);
+	TAILQ_REMOVE(&sc->sc_isrcs[irqno].is_list, ih, ih_list);
 	if (ih->ih_name != NULL)
 		evcount_detach(&ih->ih_count);
 	free(ih, M_DEVBUF, 0);

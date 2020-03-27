@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020, Mars Li <mengshi.li.mars@gmail.com>
+ * Copyright (c) 2020, Brian Bamsch <bbamsch@google.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,23 +21,24 @@
 #ifndef _LOCORE
 
 #if 0
-#include <arm/armreg.h>
-#include <arm/cpufunc.h>
+#include <machine/riscvreg.h>
+#include <machine/cpufunc.h>
 #include <machine/intr.h>
 #include <arm/softintr.h>
 #endif
 
 extern volatile int current_spl_level;
 extern volatile int softint_pending;
-void intc_do_pending(void);
+void plic_do_pending(void);
 
 #define SI_TO_IRQBIT(si)  (1U<<(si))
-void intc_setipl(int new);
-void intc_splx(int new);
-int intc_splraise(int ipl);
-int intc_spllower(int ipl);
-void intc_setsoftintr(int si);
+void plic_setipl(int new);
+void plic_splx(int new);
+int plic_splraise(int ipl);
+int plic_spllower(int ipl);
+void plic_setsoftintr(int si);
 
+#if 0
 /*
  * An useful function for interrupt handlers.
  * XXX: This shouldn't be here.
@@ -52,22 +54,23 @@ find_first_bit( uint32_t bits )
 	asm( "clz %0, %1" : "=r" (count) : "r" (bits) );
 	return 31-count;
 }
+#endif
 
 
 /*
  * This function *MUST* be called very early on in a port's
- * initarm() function, before ANY spl*() functions are called.
+ * initriscv() function, before ANY spl*() functions are called.
  *
- * The parameter is the virtual address of the OMAPINTC's Interrupt
+ * The parameter is the virtual address of the RISC-V Platform Interrupt
  * Controller registers.
  */
-void intc_intr_bootstrap(vaddr_t);
+void plic_intr_bootstrap(vaddr_t);
 
-void intc_irq_handler(void *);
-void *intc_intr_establish(int irqno, int level, int (*func)(void *),
+void plic_irq_handler(void *);
+void *plic_intr_establish(int irqno, int level, int (*func)(void *),
     void *cookie, char *name);
-void intc_intr_disestablish(void *cookie);
-const char *intc_intr_string(void *cookie);
+void plic_intr_disestablish(void *cookie);
+const char *plic_intr_string(void *cookie);
 
 #endif /* ! _LOCORE */
 

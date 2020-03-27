@@ -96,10 +96,12 @@ riscv_intc_splx(int new)
 	if (ci->ci_ipending & riscv_smask[new])
 		riscv_do_pending_intr(new);
 
-	riscv_intc_setipl(new);
+	panic("riscv_intr_splx unfinished");
+	// XXX undefined?
+	// riscv_intc_setipl(new);
 
-	/* deliver newx to plic too ?? */
-	plic_splx(new);
+	// XXX deliver newx to plic too ??
+	// plic_splx(new);
 }
 
 int
