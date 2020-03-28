@@ -50,18 +50,19 @@
     (sc->sc_contexts[h].context_offset + PLIC_CONTEXT_CLAIM)
 
 
-struct intrhand {
-	TAILQ_ENTRY(intrhand) ih_list;	/* link on intrq list */
+struct plic_intrhand {
+	TAILQ_ENTRY(plic_intrhand) ih_list; /* link on intrq list */
 	int (*ih_func)(void *);		/* handler */
 	void *ih_arg;			/* arg for handler */
 	int ih_ipl;			/* IPL_* */
+	int ih_flags;
 	int ih_irq;			/* IRQ number */
 	struct evcount	ih_count;
 	char *ih_name;
 };
 
 struct plic_irqsrc {
-	TAILQ_HEAD(, intrhand) is_list;	/* handler list */
+	TAILQ_HEAD(, plic_intrhand) is_list; /* handler list */
 	int is_irq;			/* IRQ to mask while handling */
 };
 
@@ -75,6 +76,7 @@ struct plic_softc {
 	int			sc_node;
 	bus_space_tag_t		sc_iot;
 	bus_space_handle_t	sc_ioh;
+	// XXX Consider switching sc_isrcs to malloc'd memory to reduce waste
 	struct plic_irqsrc	sc_isrcs[PLIC_MAX_IRQS];
 #if 0	// Masking is done via setting priority threshold?
 	u_int32_t 		sc_imask[NIPL];
@@ -217,14 +219,6 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	    faa->fa_reg[0].size, 0, &sc->sc_ioh))
 		panic("%s: bus_space_map failed!", __func__);
 
-#if 0
-	for (i = 0; i < PLIC_MAX_IRQS; i++) {
-		bus_space_write_4(plic->sc_iot, plic->sc_ioh, INTC_ILRn(i),
-		    INTC_ILR_PRIs(INTC_MIN_PRI)|INTC_ILR_IRQ);
-
-		TAILQ_INIT(&plic_handler[i].iq_list);
-	}
-#endif
 	isrcs = sc->sc_isrcs;
 	for (irq = 1; irq <= sc->sc_ndev; irq++) {
 		isrcs[irq].is_irq = irq;
@@ -240,6 +234,9 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 		// Mask interrupt
 		bus_space_write_4(plic->sc_iot, plic->sc_ioh,
 		    PLIC_PRIORITY(irq), 0);
+
+		// Initialize Interrupt Handler List
+		TAILQ_INIT(&isrcs[irq].is_list);
 	}
 
 #if 0	// XXX Irrelevant ???
@@ -337,11 +334,12 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	sc->sc_intc.ic_establish = plic_intr_establish_fdt;
 	sc->sc_intc.ic_disestablish = plic_intr_disestablish;
 	sc->sc_intc.ic_route = plic_intr_route;
-
+	// sc->sc_intc.ic_cpu_enable = XXX Per-CPU Initialization?
 	riscv_intr_register_fdt(&sc->sc_intc);
 
 
 	plic_setipl(IPL_HIGH);  /* XXX ??? */
+	enable_interrupts();
 
 	/* enable external interrupt */
 	// XXX
@@ -361,14 +359,14 @@ plic_calc_mask(void)
 	struct cpu_info *ci = curcpu();
 	struct plic_softc *sc = plic;
 	int irq;
-	struct intrhand *ih;
+	struct plic_intrhand *ih;
 	int i;
 
 	/* PLIC irq 0 is reserved, thus we start from 1 */
 	for (irq = 1; irq < PLIC_MAX_IRQS; irq++) {
 		int max = IPL_NONE;
 		int min = IPL_HIGH;
-		TAILQ_FOREACH(ih, &sc->sc_handler[irq].is_list, ih_list) {
+		TAILQ_FOREACH(ih, &sc->sc_isrcs[irq].is_list, ih_list) {
 			if (ih->ih_ipl > max)
 				max = ih->ih_ipl;
 
@@ -376,7 +374,7 @@ plic_calc_mask(void)
 				min = ih->ih_ipl;
 		}
 
-		sc->sc_handler[irq].iq_irq = max;
+		sc->sc_isrcs[irq].iq_irq = max;
 
 		if (max == IPL_NONE)
 			min = IPL_NONE;
@@ -414,21 +412,15 @@ plic_splx(int new)
 int
 plic_spllower(int new)
 {
-#if 0
 	struct cpu_info *ci = curcpu();
 	int old = ci->ci_cpl;
 	plic_splx(new);
 	return (old);
-#else
-	panic("plic_spllower unimplemented");
-	return (new);
-#endif
 }
 
 int
 plic_splraise(int new)
 {
-#if 0
 	struct cpu_info *ci = curcpu();
 	int old;
 	old = ci->ci_cpl;
@@ -446,31 +438,23 @@ plic_splraise(int new)
 	plic_setipl(new);
 
 	return (old);
-#else
-	panic("plic_splraise unimplemented");
-	return (new);
-#endif
 }
 
 void
 plic_setipl(int new)
 {
-#if 0
 	struct cpu_info		*ci = curcpu();
-	//struct plic_softc	*sc = plic;
-	int			 psw;
+	struct plic_softc	*sc = plic;
+	uint64_t sie;
 
 	/* disable here is only to keep hardware in sync with ci->ci_cpl */
-	psw = disable_interrupts();
+	sie = disable_interrupts();
 	ci->ci_cpl = new;
 
-	/* low values are higher priority thus IPL_HIGH - pri */
-	bus_space_write_4(sc->sc_iot, sc->sc_p_ioh, ICPIPMR,
-	    (IPL_HIGH - new) << ICMIPMR_SH);
-	restore_interrupts(psw);
-#else
-	panic("plic_setipl unimplemented");
-#endif
+	/* higher values are higher priority */
+	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
+	    PLIC_THRESHOLD(sc, ci->ci_cpuid), (uint32_t)new);
+	restore_interrupts(sie);
 }
 
 #if 0	// XXX From arm64/omap/intc.c. Necessary?
@@ -492,7 +476,7 @@ plic_irq_handler(void *frame)
 {
 #if 0
 	int irq, pri, s;
-	struct intrhand *ih;
+	struct plic_intrhand *ih;
 	void *arg;
 
 	irq = bus_space_read_4(plic_iot, plic_ioh, INTC_SIR_IRQ);
@@ -502,7 +486,7 @@ plic_irq_handler(void *frame)
 
 	pri = plic_handler[irq].iq_irq;
 	s = plic_splraise(pri);
-	TAILQ_FOREACH(ih, &plic_handler[irq].iq_list, ih_list) {
+	TAILQ_FOREACH(ih, &plic_handler[irq].is_list, ih_list) {
 		if (ih->ih_arg != 0)
 			arg = ih->ih_arg;
 		else
@@ -533,32 +517,29 @@ void *
 plic_intr_establish(int irqno, int level, int (*func)(void *),
     void *arg, char *name)
 {
-	panic("plic_intr_establish unimplemented");
-	return (0);
-#if 0
 	struct plic_softc *sc = plic;
-	struct intrhand *ih;
-	int psw;
+	struct plic_intrhand *ih;
+	int sie;
 
-	if (irqno < 0 || irqno >= INTC_NIRQ)
+	if (irqno < 0 || irqno >= PLIC_MAX_IRQS)
 		panic("plic_intr_establish: bogus irqnumber %d: %s",
 		     irqno, name);
-	psw = disable_interrupts();
+	sie = disable_interrupts();
 
 	ih = malloc(sizeof *ih, M_DEVBUF, M_WAITOK);
 	ih->ih_func = func;
 	ih->ih_arg = arg;
 	ih->ih_ipl = level & IPL_IRQMASK;
-	ih->ih_flags = level & IPL_FLAGMASK;//XXX flags for ?
+	ih->ih_flags = level & IPL_FLAGMASK;
 	ih->ih_irq = irqno;
 	ih->ih_name = name;
 
-#if 0	// XXX
+#if 0	// XXX Identify Core-Local Interrupts?
 	if (IS_IRQ_LOCAL(irqno))
 		sc->sc_localcoremask[0] |= (1 << IRQ_LOCAL(irqno));
 #endif
 
-	TAILQ_INSERT_TAIL(&sc->sc_handler[irqno].is_list, ih, ih_list);
+	TAILQ_INSERT_TAIL(&sc->sc_isrcs[irqno].is_list, ih, ih_list);
 
 	if (name != NULL)
 		evcount_attach(&ih->ih_count, name, &ih->ih_irq);
@@ -570,9 +551,8 @@ plic_intr_establish(int irqno, int level, int (*func)(void *),
 #if 0	//XXX
 	plic_calc_mask();
 #endif
-	restore_interrupts(psw);
+	restore_interrupts(sie);
 	return (ih);
-#endif
 }
 
 void *
@@ -586,14 +566,14 @@ void
 plic_intr_disestablish(void *cookie)
 {
 	struct plic_softc *sc = plic;
-	struct intrhand *ih = cookie;
+	struct plic_intrhand *ih = cookie;
 	int irqno = ih->ih_irq;
-	int psw;
+	int sie;
 
-	psw = disable_interrupts();
+	sie = disable_interrupts();
 	TAILQ_REMOVE(&sc->sc_isrcs[irqno].is_list, ih, ih_list);
 	if (ih->ih_name != NULL)
 		evcount_detach(&ih->ih_count);
 	free(ih, M_DEVBUF, 0);
-	restore_interrupts(psw);
+	restore_interrupts(sie);
 }
