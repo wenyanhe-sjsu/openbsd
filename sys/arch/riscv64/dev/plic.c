@@ -43,11 +43,11 @@
 
 #define	PLIC_PRIORITY(n)	(PLIC_PRIORITY_BASE + (n) * sizeof(uint32_t))
 #define	PLIC_ENABLE(sc, n, h)						\
-    (sc->contexts[h].enable_offset + ((n) / 32) * sizeof(uint32_t))
+    (sc->sc_contexts[h].enable_offset + ((n) / 32) * sizeof(uint32_t))
 #define	PLIC_THRESHOLD(sc, h)						\
-    (sc->contexts[h].context_offset + PLIC_CONTEXT_THRESHOLD)
+    (sc->sc_contexts[h].context_offset + PLIC_CONTEXT_THRESHOLD)
 #define	PLIC_CLAIM(sc, h)						\
-    (sc->contexts[h].context_offset + PLIC_CONTEXT_CLAIM)
+    (sc->sc_contexts[h].context_offset + PLIC_CONTEXT_CLAIM)
 
 
 struct intrhand {
@@ -108,12 +108,15 @@ riscv_hartid_to_cpu(int hartid)
 {
 #ifdef MULTIPROCESSOR
 	// XXX Figure this out
+	panic("riscv_hartid_to_cpu unimplemented for multiprocessor");
+#if 0
 	int i;
 
 	CPU_FOREACH(i) {
 		if (pcpu_find(i)->pc_hart == hartid)
 			return (i);
 	}
+#endif
 #else
 	// XXX Figure this out
 	// Just force return CPU 0 for now
@@ -310,6 +313,14 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	}
 
 	free(intr, M_TEMP, len);
+
+#ifdef MULTIPROCESSOR
+	panic("plic thresholds not handled for mulitprocessor");
+#else
+	// Set CPU interrupt priority thresholds to minimum
+	bus_space_write_4(plic->sc_iot, plic->sc_ioh,
+	    PLIC_THRESHOLD(sc, 0), 0);
+#endif
 
 	plic_attached = 1;
 
