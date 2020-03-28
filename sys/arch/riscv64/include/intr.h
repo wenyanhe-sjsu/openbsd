@@ -175,7 +175,7 @@ restore_interrupts(uint64_t s)
 {
 	__asm volatile(
 		"csrs sstatus, %0"
-		:: "r" (s)
+		:: "r" (s & (SSTATUS_SIE))
 	);
 }
 
