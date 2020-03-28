@@ -100,6 +100,54 @@ void	plic_intr_disestablish(void *);
 void	plic_irq_handler(void *);
 void	plic_intr_route(void *, int , struct cpu_info *);
 
+int	riscv_hartid_to_cpu(int);
+int	plic_get_hartid(int);
+
+int
+riscv_hartid_to_cpu(int hartid)
+{
+#ifdef MULTIPROCESSOR
+	// XXX Figure this out
+	int i;
+
+	CPU_FOREACH(i) {
+		if (pcpu_find(i)->pc_hart == hartid)
+			return (i);
+	}
+#else
+	// XXX Figure this out
+	// Just force return CPU 0 for now
+	return (0);
+#endif
+
+	return (-1);
+}
+
+int
+plic_get_hartid(int intc)
+{
+	uint32_t hart;
+
+	/* Check the interrupt controller layout. */
+	if (OF_getpropintarray(intc, "#interrupt-cells", &hart,
+	    sizeof(hart)) < 0) {
+		printf(": could not find #interrupt-cells for phandle %u\n", intc);
+		return (-1);
+	}
+
+	/*
+	 * The parent of the interrupt-controller is the CPU we are
+	 * interested in, so search for its hart ID.
+	 */
+	if (OF_getpropintarray(OF_parent(intc), "reg", (uint32_t *)&hart,
+	    sizeof(hart)) < 0) {
+		printf(": could not find hartid\n");
+		return (-1);
+	}
+
+	return (hart);
+}
+
 struct cfattach plic_ca = {
 	sizeof(struct plic_softc), plic_match, plic_attach,
 };
@@ -221,12 +269,17 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	 */
 	len = OF_getproplen(node, "interrupts-extended");
 	if (len <= 0) {
-		printf(": unable to read interrupts-extended\n");
+		printf(": could not find interrupts-extended\n");
 		return;
 	}
 
 	intr = malloc(len, M_TEMP, M_WAITOK);
 	nintr = len / sizeof(*intr);
+	if (OF_getpropintarray(node, "interrupts-extended", intr, len) < 0) {
+		printf(": failed to read interrupts-extended\n");
+		free(intr, M_TEMP, len);
+		return;
+	}
 
 	for (i = 0, context = 0; i < nintr; i += 2, context++) {
 		/* Skip M-mode external interrupts */
@@ -234,7 +287,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 			continue;
 
 		/* Get the hart ID from the CLIC's phandle. */
-		hart = -1; // XXX plic_get_hartid(dev, OF_node_from_xref(cells[i]));
+		hart = plic_get_hartid(OF_getnodebyphandle(intr[i]));
 		if (hart < 0) {
 			printf(": failed to resolve hart from clic\n");
 			free(intr, M_TEMP, len);
@@ -242,7 +295,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 		}
 
 		/* Get the corresponding cpuid. */
-		cpu = -1; // XXX riscv_hartid_to_cpu(hart);
+		cpu = riscv_hartid_to_cpu(hart);
 		if (cpu < 0) {
 			printf(": invalid hart!\n");
 			free(intr, M_TEMP, len);
