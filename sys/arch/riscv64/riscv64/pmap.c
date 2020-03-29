@@ -1475,15 +1475,15 @@ void
 pmap_activate(struct proc *p)
 {
 	pmap_t pm = p->p_vmspace->vm_map.pmap;
-	int psw;
+	int sie;
 
-	psw = disable_interrupts();
+	sie = disable_interrupts();
 	if (p == curproc && pm != curcpu()->ci_curpm) {
 		load_satp(SATP_MODE(pm->pm_mode) | SATP_ASID(pm->pm_asid) |
 				SATP_PPN(pm->pm_pt0pa >> PAGE_SHIFT));
 		curcpu()->ci_curpm = pm;
 	}
-	restore_interrupts(psw);
+	restore_interrupts(sie);
 }
 
 /*
