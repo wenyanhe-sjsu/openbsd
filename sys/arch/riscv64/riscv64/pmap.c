@@ -35,7 +35,8 @@
 #include <ddb/db_extern.h>
 #include <ddb/db_output.h>
 
-void pmap_free_asid(pmap_t pm);
+void pmap_set_satp(struct proc *);
+void pmap_free_asid(pmap_t);
 
 #define cpu_tlb_flush_all()			sfence_vma()
 #define cpu_tlb_flush_page_all(va)		sfence_vma_page(va)
@@ -1478,11 +1479,8 @@ pmap_activate(struct proc *p)
 	int sie;
 
 	sie = disable_interrupts();
-	if (p == curproc && pm != curcpu()->ci_curpm) {
-		load_satp(SATP_MODE(pm->pm_mode) | SATP_ASID(pm->pm_asid) |
-				SATP_PPN(pm->pm_pt0pa >> PAGE_SHIFT));
-		curcpu()->ci_curpm = pm;
-	}
+	if (p == curproc && pm != curcpu()->ci_curpm)
+		pmap_set_satp(p);
 	restore_interrupts(sie);
 }
 
@@ -2385,4 +2383,16 @@ pmap_free_asid(pmap_t pm)
 		    bits & ~(3U << bit)) == bits)
 			break;
 	}
+}
+
+void
+pmap_set_satp(struct proc *p)
+{
+	struct cpu_info *ci = curcpu();
+	pmap_t pm = p->p_vmspace->vm_map.pmap;
+
+	load_satp(SATP_MODE(pm->pm_mode) | SATP_ASID(pm->pm_asid) |
+	    SATP_PPN(pm->pm_pt0pa >> PAGE_SHIFT));
+	__asm __volatile("sfence.vma");
+	ci->ci_curpm = pm;
 }
