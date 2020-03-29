@@ -148,10 +148,12 @@ curcpu(void)
 	return (__ci);
 }
 
+extern uint32_t boot_hart;	/* The hart we booted on. */
 extern struct cpu_info cpu_info_primary;
 extern struct cpu_info *cpu_info_list;
 
 #ifndef MULTIPROCESSOR
+
 #define cpu_number()	0
 #define CPU_IS_PRIMARY(ci)	1
 #define CPU_INFO_ITERATOR	int
@@ -160,7 +162,9 @@ extern struct cpu_info *cpu_info_list;
 #define CPU_INFO_UNIT(ci)	0
 #define MAXCPUS	1
 #define cpu_unidle(ci)
+
 #else
+
 #define cpu_number()		(curcpu()->ci_cpuid)
 #define CPU_IS_PRIMARY(ci)	((ci) == &cpu_info_primary)
 #define CPU_INFO_ITERATOR		int

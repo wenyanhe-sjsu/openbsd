@@ -90,6 +90,7 @@ extern todr_chip_handle_t todr_handle;
 
 int safepri = 0;
 
+uint32_t boot_hart;	/* The hart we booted on. */
 struct cpu_info cpu_info_primary;
 struct cpu_info *cpu_info[MAXCPUS] = { &cpu_info_primary };
 
