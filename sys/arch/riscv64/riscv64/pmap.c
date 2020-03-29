@@ -85,6 +85,7 @@ void pmap_remove_pv(struct pte_desc *pted);
 void _pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot, int flags,
     int cache);
 
+void pmap_set_mode(pmap_t);
 void pmap_allocate_asid(pmap_t);
 
 struct pmapvp0 {
@@ -836,6 +837,7 @@ pmap_pinit(pmap_t pm)
 
 	pmap_extract(pmap_kernel(), l0va, (paddr_t *)&pm->pm_pt0pa);
 
+	pmap_set_mode(pm);
 	pmap_allocate_asid(pm);
 	pmap_reference(pm);
 }
@@ -1244,10 +1246,12 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	pmap_kernel()->pm_vp.l1 = (struct pmapvp1 *)va;
 	pmap_kernel()->pm_privileged = 1;
 	pmap_kernel()->pm_asid = 0;
+	pmap_kernel()->pm_mode = SATP_MODE_SV39 >> SATP_MODE_SHIFT;
 
 	pmap_tramp.pm_vp.l1 = (struct pmapvp1 *)va + 1;
 	pmap_tramp.pm_privileged = 1;
 	pmap_tramp.pm_asid = 0;
+	pmap_tramp.pm_mode = SATP_MODE_SV39 >> SATP_MODE_SHIFT;
 
 	/* allocate memory (in unit of pages) for l2 and l3 page table */
 	for (i = VP_IDX1(VM_MIN_KERNEL_ADDRESS);
@@ -1369,7 +1373,8 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	pmap_bootstrap_dmap((vaddr_t) pmap_kernel()->pm_vp.l1, ram_start, ram_end);
 
 	//switching to new page table
-	uint64_t satp = SATP_MODE(0x8) | SATP_ASID(0) | SATP_PPN(pt1pa);
+	uint64_t satp = SATP_MODE(pmap_kernel()->pm_mode) |
+	    SATP_ASID(pmap_kernel()->pm_asid) | SATP_PPN(pt1pa);
 	__asm __volatile("csrw satp, %0" :: "r" (satp) : "memory");
 
 	printf("all mapped\n");
@@ -2334,6 +2339,15 @@ pmap_map_early(paddr_t spa, psize_t len)
 	cpu_tlb_flush_all();
 	fence_i();
 #endif
+}
+
+void
+pmap_set_mode(pmap_t pm) {
+	if (pm->have_4_level_pt) {
+		pm->pm_mode = SATP_MODE_SV48 >> SATP_MODE_SHIFT;
+	} else {
+		pm->pm_mode = SATP_MODE_SV39 >> SATP_MODE_SHIFT;
+	}
 }
 
 /*
