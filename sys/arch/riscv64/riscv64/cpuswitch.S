@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015 Dale Rahn <drahn@dalerahn.com>
+ * Copyright (c) 2020 Brian Bamsch <bbamsch@google.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
