@@ -100,7 +100,7 @@ struct plic_softc {
 	int			sc_ndev;
 	struct interrupt_controller 	sc_intc;
 };
-struct plic_softc *plic;
+struct plic_softc *plic = NULL;
 
 int	plic_match(struct device *, void *, void *);
 void	plic_attach(struct device *, struct device *, void *);
@@ -114,8 +114,9 @@ void	*plic_intr_establish(int, int, int (*)(void *),
 void	*plic_intr_establish_fdt(void *, int *, int, int (*)(void *),
 		void *, char *);
 void	plic_intr_disestablish(void *);
+int	plic_irq_dispatch(uint32_t, void *);
 int	plic_irq_handler(void *);
-void	plic_intr_route(void *, int , struct cpu_info *);
+void	plic_intr_route(void *, int, struct cpu_info *);
 
 
 /*
@@ -188,13 +189,14 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	struct cpu_info *ci;
 	CPU_INFO_ITERATOR cii;
 
+	if (plic_attached)
+		return;
+
 	sc = (struct plic_softc *)dev;
 	faa = (struct fdt_attach_args *)aux;
 
 	if (faa->fa_nreg < 1)
 		return;
-
-	plic = sc;
 
 	sc->sc_node = node = faa->fa_node;
 	sc->sc_iot = faa->fa_iot;
@@ -228,7 +230,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 		TAILQ_INIT(&isrcs[irq].is_list);
 
 		// Mask interrupt
-		bus_space_write_4(plic->sc_iot, plic->sc_ioh,
+		bus_space_write_4(sc->sc_iot, sc->sc_ioh,
 		    PLIC_PRIORITY(irq), 0);
 
 	}
@@ -306,11 +308,12 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 
 	/* Set CPU interrupt priority thresholds to minimum */
 	CPU_INFO_FOREACH(cii, ci) {
-		bus_space_write_4(plic->sc_iot, plic->sc_ioh,
+		bus_space_write_4(sc->sc_iot, sc->sc_ioh,
 		    PLIC_THRESHOLD(sc, ci->ci_cpuid), 0);
 	}
 
 	plic_attached = 1;
+	plic = sc;
 
 	/*
 	 * insert self into the external interrupt handler entry in
@@ -340,6 +343,81 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	// XXX Clear all pending interrupts?
 
 	return;
+}
+
+int
+plic_irq_handler(void *frame)
+{
+	struct plic_softc* sc;
+	uint32_t pending;
+	uint32_t cpu;
+	int handled = 0;
+
+	sc = plic;
+	cpu = cpu_number();
+
+	pending = bus_space_read_4(sc->sc_iot, sc->sc_ioh, PLIC_CLAIM(sc, cpu));
+
+	if(pending >= sc->sc_ndev)
+		return 0;
+
+	if (pending) {
+		handled = plic_irq_dispatch(pending, frame);
+		bus_space_write_4(sc->sc_iot, sc->sc_ioh,
+				PLIC_CLAIM(sc, cpu), pending);
+	}
+
+	return handled;
+}
+
+int
+plic_irq_dispatch(uint32_t irq,	void *frame)
+{
+	int pri, s;
+	int handled = 0;
+	struct plic_softc* sc;
+	struct plic_intrhand *ih;
+	void *arg;
+
+#ifdef DEBUG_INTC
+	printf("plic irq %d fired\n", irq);
+#endif
+
+	sc = plic;
+	pri = sc->sc_isrcs[irq].is_irq;
+	s = plic_splraise(pri);
+	TAILQ_FOREACH(ih, &sc->sc_isrcs[irq].is_list, ih_list) {
+#ifdef MULTIPROCESSOR
+		int need_lock;
+
+		if (ih->ih_flags & IPL_MPSAFE)
+			need_lock = 0;
+		else
+			need_lock = s < IPL_SCHED;
+
+		if (need_lock)
+			KERNEL_LOCK();
+#endif
+
+		if (ih->ih_arg != 0)
+			arg = ih->ih_arg;
+		else
+			arg = frame;
+
+		enable_interrupts();	//XXX allow preemption?
+		handled = ih->ih_func(arg);
+		disable_interrupts();
+		if (handled)
+			ih->ih_count.ec_count++;
+
+#ifdef MULTIPROCESSOR
+		if (need_lock)
+			KERNEL_UNLOCK();
+#endif
+	}
+
+	plic_splx(s);
+	return handled;
 }
 
 /*******************************************/
@@ -463,40 +541,6 @@ plic_intr_bootstrap(vaddr_t addr)
 }
 #endif
 
-int
-plic_irq_handler(void *frame)
-{
-#if 0
-	int irq, pri, s;
-	struct plic_intrhand *ih;
-	void *arg;
-
-	irq = bus_space_read_4(plic_iot, plic_ioh, INTC_SIR_IRQ);
-#ifdef DEBUG_INTC
-	printf("irq %d fired\n", irq);
-#endif
-
-	pri = plic_handler[irq].iq_irq;
-	s = plic_splraise(pri);
-	TAILQ_FOREACH(ih, &plic_handler[irq].is_list, ih_list) {
-		if (ih->ih_arg != 0)
-			arg = ih->ih_arg;
-		else
-			arg = frame;
-
-		if (ih->ih_func(arg))
-			ih->ih_count.ec_count++;
-
-	}
-	bus_space_write_4(plic_iot, plic_ioh, INTC_CONTROL,
-	    INTC_CONTROL_NEWIRQ);
-
-	plic_splx(s);
-#else
-	panic("plic_irq_handler unimplemented");
-	return 0;
-#endif
-}
 
 void
 plic_intr_route(void *cookie, int enable, struct cpu_info *ci)
