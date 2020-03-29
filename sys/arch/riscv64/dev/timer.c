@@ -220,7 +220,7 @@ riscv_timer_intr(void *frame)
 
 	csr_clear(sip, SIP_STIP);
 
-	return (0); // Handled
+	return (1); // Handled
 }
 
 void
