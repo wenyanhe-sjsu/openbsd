@@ -25,6 +25,7 @@
 #include <machine/bus.h>
 #include <machine/fdt.h>
 #include <machine/cpu.h>
+#include "riscv64/dev/riscv_cpu_intc.h"
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/fdt.h>
@@ -113,7 +114,7 @@ void	*plic_intr_establish(int, int, int (*)(void *),
 void	*plic_intr_establish_fdt(void *, int *, int, int (*)(void *),
 		void *, char *);
 void	plic_intr_disestablish(void *);
-void	plic_irq_handler(void *);
+int	plic_irq_handler(void *);
 void	plic_intr_route(void *, int , struct cpu_info *);
 
 
@@ -184,6 +185,8 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	int nintr;
 	int context;
 	int i;
+	struct cpu_info *ci;
+	CPU_INFO_ITERATOR cii;
 
 	sc = (struct plic_softc *)dev;
 	faa = (struct fdt_attach_args *)aux;
@@ -229,10 +232,6 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 		    PLIC_PRIORITY(irq), 0);
 
 	}
-
-#if 0	// XXX Irrelevant ???
-	plic_calc_mask();
-#endif
 
 	/*
 	 * Calculate the per-cpu enable and context register offsets.
@@ -301,40 +300,43 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 
 	free(intr, M_TEMP, len);
 
-#ifdef MULTIPROCESSOR
-	panic("plic thresholds not handled for mulitprocessor");
-#else
-	// Set CPU interrupt priority thresholds to minimum
-	bus_space_write_4(plic->sc_iot, plic->sc_ioh,
-	    PLIC_THRESHOLD(sc, 0), 0);
+#if 0	// XXX Irrelevant ???
+	plic_calc_mask();
 #endif
+
+	/* Set CPU interrupt priority thresholds to minimum */
+	CPU_INFO_FOREACH(cii, ci) {
+		bus_space_write_4(plic->sc_iot, plic->sc_ioh,
+		    PLIC_THRESHOLD(sc, ci->ci_cpuid), 0);
+	}
 
 	plic_attached = 1;
 
 	/*
-	 * insert self as external interrupt handler,
-	 * might need a different func call
-	 *
-	riscv_set_intr_handler(plic_splraise, plic_spllower, plic_splx,
-		plic_setipl, plic_irq_handler);
-	*/
+	 * insert self into the external interrupt handler entry in
+	 * global interrupt handler vector
+	 */
+	riscv_intc_intr_establish(IRQ_EXTERNAL_SUPERVISOR, 0,
+			plic_irq_handler, NULL, "plic");
 
 	sc->sc_intc.ic_node = faa->fa_node;
 	sc->sc_intc.ic_cookie = sc;
 	sc->sc_intc.ic_establish = plic_intr_establish_fdt;
 	sc->sc_intc.ic_disestablish = plic_intr_disestablish;
-	sc->sc_intc.ic_route = plic_intr_route;
+	// sc->sc_intc.ic_enable = XXX;
+	// sc->sc_intc.ic_disable = XXX;
+	// sc->sc_intc.ic_route = plic_intr_route;
 	// sc->sc_intc.ic_cpu_enable = XXX Per-CPU Initialization?
+
 	riscv_intr_register_fdt(&sc->sc_intc);
 
 
 	plic_setipl(IPL_HIGH);  /* XXX ??? */
-	enable_interrupts();
 
 	/* enable external interrupt */
-	// XXX
-	
+	csr_set(sie, SIE_SEIE);
 
+	enable_interrupts();	
 	// XXX Clear all pending interrupts?
 
 	return;
@@ -461,7 +463,7 @@ plic_intr_bootstrap(vaddr_t addr)
 }
 #endif
 
-void
+int
 plic_irq_handler(void *frame)
 {
 #if 0
@@ -492,6 +494,7 @@ plic_irq_handler(void *frame)
 	plic_splx(s);
 #else
 	panic("plic_irq_handler unimplemented");
+	return 0;
 #endif
 }
 
