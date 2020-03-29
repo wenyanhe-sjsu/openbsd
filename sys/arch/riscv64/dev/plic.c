@@ -24,10 +24,21 @@
 
 #include <machine/bus.h>
 #include <machine/fdt.h>
+#include <machine/cpu.h>
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/fdt.h>
 
+/*
+ * This driver implements a version of the RISC-V PLIC with the actual layout
+ * specified in chapter 8 of the SiFive U5 Coreplex Series Manual:
+ *
+ *     https://static.dev.sifive.com/U54-MC-RVCoreIP.pdf
+ *
+ * The largest number supported by devices marked as 'sifive,plic-1.0.0', is
+ * 1024, of which device 0 is defined as non-existent by the RISC-V Privileged
+ * Spec.
+ */
 
 #define	PLIC_MAX_IRQS		1024
 
@@ -63,7 +74,10 @@ struct plic_intrhand {
 
 struct plic_irqsrc {
 	TAILQ_HEAD(, plic_intrhand) is_list; /* handler list */
-	int is_irq;			/* IRQ to mask while handling */
+	int 			is_irq;	/* IRQ to mask while handling */
+#if 0
+	struct device		is_dev;	/* from which device this intr comes */
+#endif
 };
 
 struct plic_context {
@@ -102,36 +116,18 @@ void	plic_intr_disestablish(void *);
 void	plic_irq_handler(void *);
 void	plic_intr_route(void *, int , struct cpu_info *);
 
-int	riscv_hartid_to_cpu(int);
-int	plic_get_hartid(int);
 
+/*
+ * OpenBSD saves cpu node info in ci struct, so we can search
+ * cpuid by node matching
+ */
 int
-riscv_hartid_to_cpu(int hartid)
-{
-#ifdef MULTIPROCESSOR
-	// XXX Figure this out
-	panic("riscv_hartid_to_cpu unimplemented for multiprocessor");
-#if 0
-	int i;
-
-	CPU_FOREACH(i) {
-		if (pcpu_find(i)->pc_hart == hartid)
-			return (i);
-	}
-#endif
-#else
-	// XXX Figure this out
-	// Just force return CPU 0 for now
-	return (0);
-#endif
-
-	return (-1);
-}
-
-int
-plic_get_hartid(int intc)
+plic_get_cpuid(int intc)
 {
 	uint32_t hart;
+	int parent_node;
+	struct cpu_info *ci;
+	CPU_INFO_ITERATOR cii;
 
 	/* Check the interrupt controller layout. */
 	if (OF_getpropintarray(intc, "#interrupt-cells", &hart,
@@ -142,15 +138,14 @@ plic_get_hartid(int intc)
 
 	/*
 	 * The parent of the interrupt-controller is the CPU we are
-	 * interested in, so search for its hart ID.
+	 * interested in, so search for its OF node index.
 	 */
-	if (OF_getpropintarray(OF_parent(intc), "reg", (uint32_t *)&hart,
-	    sizeof(hart)) < 0) {
-		printf(": could not find hartid\n");
-		return (-1);
+	parent_node = OF_parent(intc);
+	CPU_INFO_FOREACH(cii, ci) {
+		if(ci->ci_node == parent_node)
+			return ci->ci_cpuid;
 	}
-
-	return (hart);
+	return -1;
 }
 
 struct cfattach plic_ca = {
@@ -181,7 +176,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	struct plic_irqsrc *isrcs;
 	struct plic_softc *sc;
 	struct fdt_attach_args *faa;
-	uint32_t* intr;
+	uint32_t *intr;
 	uint32_t irq;
 	uint32_t cpu;
 	int node;
@@ -189,7 +184,6 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	int nintr;
 	int context;
 	int i;
-	int hart;
 
 	sc = (struct plic_softc *)dev;
 	faa = (struct fdt_attach_args *)aux;
@@ -221,22 +215,19 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 
 	isrcs = sc->sc_isrcs;
 	for (irq = 1; irq <= sc->sc_ndev; irq++) {
+		/*
+		 * Register Interrupt Source:
+		 * actually happens while device is attached, here only need to:
+		 * Setup irq;
+		 * Initialize Interrupt Handler List
+		 */
 		isrcs[irq].is_irq = irq;
-
-		// Register Interrupt Source
-#if 0		// Example (from FreeBSD)
-		error = intr_isrc_register(&isrcs[irq].isrc, sc->dev,
-		    0, "%s,%u", name, irq);
-		if (error != 0)
-			return (error);
-#endif
+		TAILQ_INIT(&isrcs[irq].is_list);
 
 		// Mask interrupt
 		bus_space_write_4(plic->sc_iot, plic->sc_ioh,
 		    PLIC_PRIORITY(irq), 0);
 
-		// Initialize Interrupt Handler List
-		TAILQ_INIT(&isrcs[irq].is_list);
 	}
 
 #if 0	// XXX Irrelevant ???
@@ -261,11 +252,10 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	 * 1. Examine the PLIC's "interrupts-extended" property and skip any
 	 *    entries that are not for supervisor external interrupts.
 	 *
-	 * 2. Walk up the device tree to find the corresponding CPU, and grab
-	 *    it's hart ID.
+	 * 2. Walk up the device tree to find the corresponding CPU, using node
+	 *    property to identify the cpuid.
 	 *
-	 * 3. Convert the hart to a cpuid, and calculate the register offsets
-	 *    based on the context number.
+	 * 3. Calculate the register offsets based on the context number.
 	 */
 	len = OF_getproplen(node, "interrupts-extended");
 	if (len <= 0) {
@@ -286,23 +276,23 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 		if (intr[i + 1] != IRQ_EXTERNAL_SUPERVISOR)
 			continue;
 
-		/* Get the hart ID from the CLIC's phandle. */
-		hart = plic_get_hartid(OF_getnodebyphandle(intr[i]));
-		if (hart < 0) {
-			printf(": failed to resolve hart from clic\n");
-			free(intr, M_TEMP, len);
-			return;
-		}
-
 		/* Get the corresponding cpuid. */
-		cpu = riscv_hartid_to_cpu(hart);
+		cpu = plic_get_cpuid(OF_getnodebyphandle(intr[i]));
 		if (cpu < 0) {
 			printf(": invalid hart!\n");
 			free(intr, M_TEMP, len);
 			return;
 		}
 
-		/* Set the enable and context register offsets for the CPU. */
+		/*
+		 * Set the enable and context register offsets for the CPU.
+		 *
+		 * XXX this calculation formula should be WRONG, as per sifive
+		 * plic spec, machine mode and supervisor mode context are
+		 * interleaved.
+		 * We can not assume we are running inside machine/supervisor
+		 * mode.
+		 */
 		sc->sc_contexts[cpu].enable_offset = PLIC_ENABLE_BASE +
 		    context * PLIC_ENABLE_STRIDE;
 		sc->sc_contexts[cpu].context_offset = PLIC_CONTEXT_BASE +
