@@ -109,13 +109,13 @@ int	plic_spllower(int);
 int	plic_splraise(int);
 void	plic_setipl(int);
 void	plic_calc_mask(void);
+int	plic_irq_handler(void *);
+int	plic_irq_dispatch(uint32_t, void *);
 void	*plic_intr_establish(int, int, int (*)(void *),
 		void *, char *);
 void	*plic_intr_establish_fdt(void *, int *, int, int (*)(void *),
 		void *, char *);
 void	plic_intr_disestablish(void *);
-int	plic_irq_dispatch(uint32_t, void *);
-int	plic_irq_handler(void *);
 void	plic_intr_route(void *, int, struct cpu_info *);
 
 
@@ -178,12 +178,12 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	struct plic_irqsrc *isrcs;
 	struct plic_softc *sc;
 	struct fdt_attach_args *faa;
-	uint32_t *intr;
+	uint32_t *cells;
 	uint32_t irq;
 	uint32_t cpu;
 	int node;
 	int len;
-	int nintr;
+	int ncell;
 	int context;
 	int i;
 	struct cpu_info *ci;
@@ -264,35 +264,38 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 		return;
 	}
 
-	intr = malloc(len, M_TEMP, M_WAITOK);
-	nintr = len / sizeof(*intr);
-	if (OF_getpropintarray(node, "interrupts-extended", intr, len) < 0) {
+	cells = malloc(len, M_TEMP, M_WAITOK);
+	ncell = len / sizeof(*cells);
+	if (OF_getpropintarray(node, "interrupts-extended", cells, len) < 0) {
 		printf(": failed to read interrupts-extended\n");
-		free(intr, M_TEMP, len);
+		free(cells, M_TEMP, len);
 		return;
 	}
 
-	for (i = 0, context = 0; i < nintr; i += 2, context++) {
+	for (i = 0, context = 0; i < ncell; i += 2, context++) {
 		/* Skip M-mode external interrupts */
-		if (intr[i + 1] != IRQ_EXTERNAL_SUPERVISOR)
+		if (cells[i + 1] != IRQ_EXTERNAL_SUPERVISOR)
 			continue;
 
 		/* Get the corresponding cpuid. */
-		cpu = plic_get_cpuid(OF_getnodebyphandle(intr[i]));
+		cpu = plic_get_cpuid(OF_getnodebyphandle(cells[i]));
 		if (cpu < 0) {
 			printf(": invalid hart!\n");
-			free(intr, M_TEMP, len);
+			free(cells, M_TEMP, len);
 			return;
 		}
 
 		/*
 		 * Set the enable and context register offsets for the CPU.
 		 *
-		 * XXX this calculation formula should be WRONG, as per sifive
-		 * plic spec, machine mode and supervisor mode context are
-		 * interleaved.
-		 * We can not assume we are running inside machine/supervisor
-		 * mode.
+		 * We assume S-mode handler always comes later than M-mode
+		 * handler, but this might be a little fragile.
+		 *
+		 * XXX
+		 * sifive spec doesn't list hart0 S-mode enable/contexts
+		 * in its memory map, but QEMU emulates hart0 S-mode
+		 * enable/contexts? Otherwise the following offset calculation
+		 * would point to hart1 M-mode enable/contexts.
 		 */
 		sc->sc_contexts[cpu].enable_offset = PLIC_ENABLE_BASE +
 		    context * PLIC_ENABLE_STRIDE;
@@ -300,7 +303,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 		    context * PLIC_CONTEXT_STRIDE;
 	}
 
-	free(intr, M_TEMP, len);
+	free(cells, M_TEMP, len);
 
 #if 0	// XXX Irrelevant ???
 	plic_calc_mask();
@@ -332,7 +335,6 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	// sc->sc_intc.ic_cpu_enable = XXX Per-CPU Initialization?
 
 	riscv_intr_register_fdt(&sc->sc_intc);
-
 
 	plic_setipl(IPL_HIGH);  /* XXX ??? */
 
@@ -420,6 +422,66 @@ plic_irq_dispatch(uint32_t irq,	void *frame)
 	return handled;
 }
 
+void *
+plic_intr_establish(int irqno, int level, int (*func)(void *),
+    void *arg, char *name)
+{
+	struct plic_softc *sc = plic;
+	struct plic_intrhand *ih;
+	int psw;
+
+	if (irqno < 0 || irqno >= PLIC_MAX_IRQS)
+		panic("plic_intr_establish: bogus irqnumber %d: %s",
+		     irqno, name);
+	psw = disable_interrupts();
+
+	ih = malloc(sizeof *ih, M_DEVBUF, M_WAITOK);
+	ih->ih_func = func;
+	ih->ih_arg = arg;
+	ih->ih_ipl = level & IPL_IRQMASK;
+	ih->ih_flags = level & IPL_FLAGMASK;
+	ih->ih_irq = irqno;
+	ih->ih_name = name;
+
+	TAILQ_INSERT_TAIL(&sc->sc_isrcs[irqno].is_list, ih, ih_list);
+
+	if (name != NULL)
+		evcount_attach(&ih->ih_count, name, &ih->ih_irq);
+
+#ifdef DEBUG_INTC
+	printf("%s irq %d level %d [%s]\n", __func__, irqno, level,
+	    name);
+#endif
+
+#if 0	//XXX
+	plic_calc_mask();
+#endif
+	restore_interrupts(psw);
+	return (ih);
+}
+
+void *
+plic_intr_establish_fdt(void *cookie, int *cell, int level,
+    int (*func)(void *), void *arg, char *name)
+{
+	return plic_intr_establish(cell[0], level, func, arg, name);
+}
+
+void
+plic_intr_disestablish(void *cookie)
+{
+	struct plic_softc *sc = plic;
+	struct plic_intrhand *ih = cookie;
+	int irqno = ih->ih_irq;
+	int psw;
+
+	psw = disable_interrupts();
+	TAILQ_REMOVE(&sc->sc_isrcs[irqno].is_list, ih, ih_list);
+	if (ih->ih_name != NULL)
+		evcount_detach(&ih->ih_count);
+	free(ih, M_DEVBUF, 0);
+	restore_interrupts(psw);
+}
 /*******************************************/
 
 #if 0
@@ -550,67 +612,3 @@ plic_intr_route(void *cookie, int enable, struct cpu_info *ci)
 	return;
 }
 
-void *
-plic_intr_establish(int irqno, int level, int (*func)(void *),
-    void *arg, char *name)
-{
-	struct plic_softc *sc = plic;
-	struct plic_intrhand *ih;
-	int sie;
-
-	if (irqno < 0 || irqno >= PLIC_MAX_IRQS)
-		panic("plic_intr_establish: bogus irqnumber %d: %s",
-		     irqno, name);
-	sie = disable_interrupts();
-
-	ih = malloc(sizeof *ih, M_DEVBUF, M_WAITOK);
-	ih->ih_func = func;
-	ih->ih_arg = arg;
-	ih->ih_ipl = level & IPL_IRQMASK;
-	ih->ih_flags = level & IPL_FLAGMASK;
-	ih->ih_irq = irqno;
-	ih->ih_name = name;
-
-#if 0	// XXX Identify Core-Local Interrupts?
-	if (IS_IRQ_LOCAL(irqno))
-		sc->sc_localcoremask[0] |= (1 << IRQ_LOCAL(irqno));
-#endif
-
-	TAILQ_INSERT_TAIL(&sc->sc_isrcs[irqno].is_list, ih, ih_list);
-
-	if (name != NULL)
-		evcount_attach(&ih->ih_count, name, &ih->ih_irq);
-
-#ifdef DEBUG_INTC
-	printf("%s irq %d level %d [%s]\n", __func__, irqno, level,
-	    name);
-#endif
-#if 0	//XXX
-	plic_calc_mask();
-#endif
-	restore_interrupts(sie);
-	return (ih);
-}
-
-void *
-plic_intr_establish_fdt(void *cookie, int *cell, int level,
-    int (*func)(void *), void *arg, char *name)
-{
-	return plic_intr_establish(cell[0], level, func, arg, name);
-}
-
-void
-plic_intr_disestablish(void *cookie)
-{
-	struct plic_softc *sc = plic;
-	struct plic_intrhand *ih = cookie;
-	int irqno = ih->ih_irq;
-	int sie;
-
-	sie = disable_interrupts();
-	TAILQ_REMOVE(&sc->sc_isrcs[irqno].is_list, ih, ih_list);
-	if (ih->ih_name != NULL)
-		evcount_detach(&ih->ih_count);
-	free(ih, M_DEVBUF, 0);
-	restore_interrupts(sie);
-}
