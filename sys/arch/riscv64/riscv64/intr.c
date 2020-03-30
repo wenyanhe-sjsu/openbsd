@@ -403,18 +403,18 @@ void
 riscv_do_pending_intr(int pcpl)
 {
 	struct cpu_info *ci = curcpu();
-	int oldirqstate;
+	int sie;
 
-	oldirqstate = disable_interrupts();
+	sie = disable_interrupts();
 
 #define DO_SOFTINT(si, ipl) \
 	if ((ci->ci_ipending & riscv_smask[pcpl]) &	\
 	    SI_TO_IRQBIT(si)) {						\
 		ci->ci_ipending &= ~SI_TO_IRQBIT(si);			\
 		riscv_intr_func.setipl(ipl);				\
-		restore_interrupts(oldirqstate);			\
+		restore_interrupts(sie);			\
 		softintr_dispatch(si);					\
-		oldirqstate = disable_interrupts();			\
+		sie = disable_interrupts();			\
 	}
 
 	do {
@@ -426,7 +426,7 @@ riscv_do_pending_intr(int pcpl)
 
 	/* Don't use splx... we are here already! */
 	riscv_intr_func.setipl(pcpl);
-	restore_interrupts(oldirqstate);
+	restore_interrupts(sie);
 }
 
 void riscv_set_intr_handler(int (*raise)(int), int (*lower)(int),
