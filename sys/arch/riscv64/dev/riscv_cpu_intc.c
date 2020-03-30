@@ -140,13 +140,13 @@ void *
 riscv_intc_intr_establish(int irqno, int dummy_level, int (*func)(void *),
     void *arg, char *name)
 {
-	int psw;
+	int sie;
 	struct intrhand *ih;
 
 	if (irqno < 0 || irqno >= INTC_NIRQS)
 		panic("intc_intr_establish: bogus irqnumber %d: %s",
 		     irqno, name);
-	psw = disable_interrupts();
+	sie = disable_interrupts();
 
 	ih = malloc(sizeof(*ih), M_DEVBUF, M_WAITOK);
 	ih->ih_func = func;
@@ -158,20 +158,20 @@ riscv_intc_intr_establish(int irqno, int dummy_level, int (*func)(void *),
 #ifdef DEBUG_INTC
 	printf("intc_intr_establish irq %d [%s]\n", irqno, name);
 #endif
-	restore_interrupts(psw);
+	restore_interrupts(sie);
 	return (ih);
 }
 
 void
 riscv_intc_intr_disestablish(void *cookie)
 {
-	int psw;
+	int sie;
 	struct intrhand *ih = cookie;
 	int irqno = ih->ih_irq;
-	psw = disable_interrupts();
+	sie = disable_interrupts();
 
 	intc_handler[irqno] = NULL;
 	free(ih, M_DEVBUF, 0);
 
-	restore_interrupts(psw);
+	restore_interrupts(sie);
 }

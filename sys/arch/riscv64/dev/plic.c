@@ -428,12 +428,12 @@ plic_intr_establish(int irqno, int level, int (*func)(void *),
 {
 	struct plic_softc *sc = plic;
 	struct plic_intrhand *ih;
-	int psw;
+	int sie;
 
 	if (irqno < 0 || irqno >= PLIC_MAX_IRQS)
 		panic("plic_intr_establish: bogus irqnumber %d: %s",
 		     irqno, name);
-	psw = disable_interrupts();
+	sie = disable_interrupts();
 
 	ih = malloc(sizeof *ih, M_DEVBUF, M_WAITOK);
 	ih->ih_func = func;
@@ -456,7 +456,7 @@ plic_intr_establish(int irqno, int level, int (*func)(void *),
 #if 0	//XXX
 	plic_calc_mask();
 #endif
-	restore_interrupts(psw);
+	restore_interrupts(sie);
 	return (ih);
 }
 
@@ -473,14 +473,14 @@ plic_intr_disestablish(void *cookie)
 	struct plic_softc *sc = plic;
 	struct plic_intrhand *ih = cookie;
 	int irqno = ih->ih_irq;
-	int psw;
+	int sie;
 
-	psw = disable_interrupts();
+	sie = disable_interrupts();
 	TAILQ_REMOVE(&sc->sc_isrcs[irqno].is_list, ih, ih_list);
 	if (ih->ih_name != NULL)
 		evcount_detach(&ih->ih_count);
 	free(ih, M_DEVBUF, 0);
-	restore_interrupts(psw);
+	restore_interrupts(sie);
 }
 /*******************************************/
 
