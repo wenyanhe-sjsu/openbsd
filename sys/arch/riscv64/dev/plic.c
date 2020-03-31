@@ -75,6 +75,10 @@ struct plic_intrhand {
 	char *ih_name;
 };
 
+/* One interrupt source could have multiple handler attached,
+ * each handler could have different priority level,
+ * we track the max and min priority level.
+ */
 struct plic_irqsrc {
 	TAILQ_HEAD(, plic_intrhand) is_list; /* handler list */
 	int 	is_irq_max;	/* IRQ to mask while handling */
@@ -341,9 +345,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 
 	free(cells, M_TEMP, len);
 
-#if 0	// XXX Irrelevant ???
 	plic_calc_mask();
-#endif
 
 	/* Set CPU interrupt priority thresholds to minimum */
 	CPU_INFO_FOREACH(cii, ci) {
@@ -376,7 +378,6 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	csr_set(sie, SIE_SEIE);
 
 	enable_interrupts();	
-	// XXX Clear all pending interrupts?
 
 	return;
 }
@@ -392,7 +393,8 @@ plic_irq_handler(void *frame)
 	sc = plic;
 	cpu = cpu_number();
 
-	pending = bus_space_read_4(sc->sc_iot, sc->sc_ioh, PLIC_CLAIM(sc, cpu));
+	pending = bus_space_read_4(sc->sc_iot, sc->sc_ioh,
+			PLIC_CLAIM(sc, cpu));
 
 	if(pending >= sc->sc_ndev)
 		return 0;
@@ -487,9 +489,8 @@ plic_intr_establish(int irqno, int level, int (*func)(void *),
 	    name);
 #endif
 
-#if 0	//XXX
 	plic_calc_mask();
-#endif
+
 	restore_interrupts(sie);
 	return (ih);
 }
@@ -619,20 +620,22 @@ plic_intr_route_ih(void *cookie, int enable, struct cpu_info *ci)
 	plic_intr_route(ih->ih_irq, enable, ci);
 }
 
-/*******************************************/
-
-#if 0
+ 
+ /*
+  * update the max/min priority for an interrupt src,
+  * and enforce the updated priority to plic.
+  * this should be called whenever a new handler is attached.
+  */
 void
 plic_calc_mask(void)
 {
-	struct cpu_info *ci = curcpu();
-	struct plic_softc *sc = plic;
-	int irq;
-	struct plic_intrhand *ih;
-	int i;
+	struct cpu_info 	*ci = curcpu();
+	struct plic_softc 	*sc = plic;
+	struct plic_intrhand 	*ih;
+	int 			irq;
 
 	/* PLIC irq 0 is reserved, thus we start from 1 */
-	for (irq = 1; irq < PLIC_MAX_IRQS; irq++) {
+	for (irq = 1; irq <= sc->sc_ndev; irq++) {
 		int max = IPL_NONE;
 		int min = IPL_HIGH;
 		TAILQ_FOREACH(ih, &sc->sc_isrcs[irq].is_list, ih_list) {
@@ -643,24 +646,26 @@ plic_calc_mask(void)
 				min = ih->ih_ipl;
 		}
 
-		sc->sc_isrcs[irq].iq_irq = max;
-
 		if (max == IPL_NONE)
 			min = IPL_NONE;
 
-#if 0 // DEBUG_PLIC
-		if (min != IPL_NONE) {
-			printf("irq %d to block at %d %d reg %d bit %d\n",
-			    irq, max, min, INTC_IRQ_TO_REG(irq),
-			    INTC_IRQ_TO_REGi(irq));
-		}
-#endif
+		if (sc->sc_isrcs[irq].is_irq_max == max &&
+		    sc->sc_isrcs[irq].is_irq_min == min)
+			continue;
+
+		sc->sc_isrcs[irq].is_irq_max = max;
+		sc->sc_isrcs[irq].is_irq_min = min;
+
 		/* Enable interrupts at lower levels, clear -> enable */
-		for (i = 1; i < min; i++)
-			plic_imask[i] &= ~(1 << (irq));// XXX
-		for (; i <= IPL_HIGH; i++)
-			plic_imask[i] |= (1 << (irq));// XXX
+		/* Set interrupt priority/enable */
+		if (min != IPL_NONE) {
+			plic_set_priority(irq, min);
+			plic_intr_route(irq, IRQ_ENABLE, ci);
+		} else {
+			plic_intr_disable(irq);
+			plic_intr_route(irq, IRQ_DISABLE, ci);
+		}
 	}
+
 	plic_setipl(ci->ci_cpl);
 }
-#endif
