@@ -91,11 +91,7 @@ struct plic_softc {
 	int			sc_node;
 	bus_space_tag_t		sc_iot;
 	bus_space_handle_t	sc_ioh;
-	// XXX Consider switching sc_isrcs to malloc'd memory to reduce waste
-	struct plic_irqsrc	sc_isrcs[PLIC_MAX_IRQS];
-#if 0	// Masking is done via setting priority threshold?
-	u_int32_t 		sc_imask[NIPL];
-#endif
+	struct plic_irqsrc	*sc_isrcs;
 	struct plic_context	sc_contexts[MAXCPUS];
 	int			sc_ndev;
 	struct interrupt_controller 	sc_intc;
@@ -218,7 +214,6 @@ plic_match(struct device *parent, void *cfdata, void *aux)
 void
 plic_attach(struct device *parent, struct device *dev, void *aux)
 {
-	struct plic_irqsrc *isrcs;
 	struct plic_softc *sc;
 	struct fdt_attach_args *faa;
 	uint32_t *cells;
@@ -261,7 +256,8 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	    faa->fa_reg[0].size, 0, &sc->sc_ioh))
 		panic("%s: bus_space_map failed!", __func__);
 
-	isrcs = sc->sc_isrcs;
+	sc->sc_isrcs = mallocarray(PLIC_MAX_IRQS, sizeof(struct plic_irqsrc),
+			M_DEVBUF, M_ZERO | M_NOWAIT);
 	for (irq = 1; irq <= sc->sc_ndev; irq++) {
 		/*
 		 * Register Interrupt Source:
@@ -269,7 +265,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 		 * Setup irq;
 		 * Initialize Interrupt Handler List
 		 */
-		TAILQ_INIT(&isrcs[irq].is_list);
+		TAILQ_INIT(&sc->sc_isrcs[irq].is_list);
 
 		// Mask interrupt
 		plic_intr_disable(irq);
