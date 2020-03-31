@@ -25,9 +25,10 @@ int	plic_spllower(int);
 int	plic_splraise(int);
 void	plic_setipl(int);
 
-void	plic_irq_handler(void *);
 void 	*plic_intr_establish(int, int, int (*)(void *),
 		void *, char *);
+void 	*plic_intr_establish_fdt(void *, int *, int,
+		int (*)(void *), void *, char *);
 void 	plic_intr_disestablish(void *);
 
 #endif /* ! _LOCORE */

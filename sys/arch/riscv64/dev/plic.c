@@ -198,16 +198,10 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 
 	sc->sc_isrcs = mallocarray(PLIC_MAX_IRQS, sizeof(struct plic_irqsrc),
 			M_DEVBUF, M_ZERO | M_NOWAIT);
-	for (irq = 1; irq <= sc->sc_ndev; irq++) {
-		/*
-		 * Register Interrupt Source:
-		 * actually happens while device is attached, here only need to:
-		 * Initialize Interrupt Handler List
-		 */
-		TAILQ_INIT(&sc->sc_isrcs[irq].is_list);
 
-		// Mask interrupt
-		plic_set_priority(irq, 0);
+	for (irq = 1; irq <= sc->sc_ndev; irq++) {
+		TAILQ_INIT(&sc->sc_isrcs[irq].is_list);
+		plic_set_priority(irq, 0);// Mask interrupt
 	}
 
 	/*
@@ -279,15 +273,13 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 
 	free(cells, M_TEMP, len);
 
-	plic_calc_mask();
-
 	/* Set CPU interrupt priority thresholds to minimum */
 	CPU_INFO_FOREACH(cii, ci) {
 		plic_set_threshold(ci->ci_cpuid, 0);
 	}
 
-	plic_attached = 1;
-	plic = sc;
+	plic_setipl(IPL_HIGH);  /* XXX ??? */
+	plic_calc_mask();
 
 	/*
 	 * insert self into the external interrupt handler entry in
@@ -295,6 +287,12 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	 */
 	riscv_intc_intr_establish(IRQ_EXTERNAL_SUPERVISOR, 0,
 			plic_irq_handler, NULL, "plic");
+
+	plic_attached = 1;
+	plic = sc;
+
+	/* enable external interrupt */
+	csr_set(sie, SIE_SEIE);
 
 	sc->sc_intc.ic_node = faa->fa_node;
 	sc->sc_intc.ic_cookie = sc;
@@ -304,15 +302,6 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	// sc->sc_intc.ic_cpu_enable = XXX Per-CPU Initialization?
 
 	riscv_intr_register_fdt(&sc->sc_intc);
-
-	plic_setipl(IPL_HIGH);  /* XXX ??? */
-
-	/* enable external interrupt */
-	csr_set(sie, SIE_SEIE);
-
-	enable_interrupts();	
-
-	return;
 }
 
 int
@@ -694,7 +683,7 @@ void
 plic_intr_disable(int irq, int cpu)
 {
 	plic_set_priority(irq, 0);
-	plic_set_threshold(cpu, 0);
+	plic_set_threshold(cpu, IPL_HIGH);
 	plic_intr_route_grid(irq, IRQ_DISABLE, cpu);
 }
 /***************** end of helper functions *****************/
