@@ -75,7 +75,8 @@ struct plic_intrhand {
 	char *ih_name;
 };
 
-/* One interrupt source could have multiple handler attached,
+/*
+ * One interrupt source could have multiple handler attached,
  * each handler could have different priority level,
  * we track the max and min priority level.
  */
@@ -111,87 +112,22 @@ void	*plic_intr_establish(int, int, int (*)(void *),
 void	*plic_intr_establish_fdt(void *, int *, int, int (*)(void *),
 		void *, char *);
 void	plic_intr_disestablish(void *);
+void	plic_intr_route(void *, int, struct cpu_info *);
 
 void	plic_splx(int);
 int	plic_spllower(int);
 int	plic_splraise(int);
 void	plic_setipl(int);
-
-void	plic_intr_route_ih(void *, int, struct cpu_info *);
 void	plic_calc_mask(void);
 
-/***************** helper functions *****************/
+/* helper function */
+int	plic_get_cpuid(int);
+void	plic_set_priority(int, uint32_t);
+void	plic_set_threshold(int, uint32_t);
+void	plic_intr_route_grid(int, int, int);
+void	plic_intr_enable_with_pri(int, uint32_t, int);
+void	plic_intr_disable(int, int);
 
-/*
- * OpenBSD saves cpu node info in ci struct, so we can search
- * cpuid by node matching
- */
-int
-plic_get_cpuid(int intc)
-{
-	uint32_t hart;
-	int parent_node;
-	struct cpu_info *ci;
-	CPU_INFO_ITERATOR cii;
-
-	/* Check the interrupt controller layout. */
-	if (OF_getpropintarray(intc, "#interrupt-cells", &hart,
-	    sizeof(hart)) < 0) {
-		printf(": could not find #interrupt-cells for phandle %u\n", intc);
-		return (-1);
-	}
-
-	/*
-	 * The parent of the interrupt-controller is the CPU we are
-	 * interested in, so search for its OF node index.
-	 */
-	parent_node = OF_parent(intc);
-	CPU_INFO_FOREACH(cii, ci) {
-		if(ci->ci_node == parent_node)
-			return ci->ci_cpuid;
-	}
-	return -1;
-}
-
-void
-plic_set_priority(int irq, int pri)
-{
-	struct plic_softc	*sc = plic;
-	uint32_t		prival;
-
-	/*
-	 * sifive plic only has 0 - 7 priority levels, yet OpenBSD defines
-	 * 0 - 12 priority levels(level 1 - 4 are for SOFT*, level 12
-	 * is for IPI. They should NEVER be passed to plic.
-	 * So we calculate plic priority in the following way:
-	 */
-	if(pri == 0)
-		prival = 0;//effectively disable this intr source
-
-	if(pri <= 4 || pri >= 12)//invalid input
-		return;
-
-	prival = pri - 4;
-
-	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
-	    PLIC_PRIORITY(irq), prival);
-}
-
-void
-plic_intr_enable(int irq)
-{
-	struct plic_softc	*sc = plic;
-
-	plic_set_priority(irq, sc->sc_isrcs[irq].is_irq_min);
-}
-
-void
-plic_intr_disable(int irq)
-{
-	plic_set_priority(irq, 0);
-}
-
-/***************** end of helper functions *****************/
 
 struct cfattach plic_ca = {
 	sizeof(struct plic_softc), plic_match, plic_attach,
@@ -266,21 +202,19 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 		/*
 		 * Register Interrupt Source:
 		 * actually happens while device is attached, here only need to:
-		 * Setup irq;
 		 * Initialize Interrupt Handler List
 		 */
 		TAILQ_INIT(&sc->sc_isrcs[irq].is_list);
 
 		// Mask interrupt
-		plic_intr_disable(irq);
+		plic_set_priority(irq, 0);
 	}
 
 	/*
 	 * Calculate the per-cpu enable and context register offsets.
 	 *
 	 * This is tricky for a few reasons. The PLIC divides the interrupt
-	 * enable, threshold, and claim bits by "context", where each context
-	 * routes to a Core-Local Interrupt Controller (CLIC).
+	 * enable, threshold, and claim bits by "context"
 	 *
 	 * The tricky part is that the PLIC spec imposes no restrictions on how
 	 * these contexts are laid out. So for example, there is no guarantee
@@ -349,8 +283,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 
 	/* Set CPU interrupt priority thresholds to minimum */
 	CPU_INFO_FOREACH(cii, ci) {
-		bus_space_write_4(sc->sc_iot, sc->sc_ioh,
-		    PLIC_THRESHOLD(sc, ci->ci_cpuid), 0);
+		plic_set_threshold(ci->ci_cpuid, 0);
 	}
 
 	plic_attached = 1;
@@ -367,7 +300,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	sc->sc_intc.ic_cookie = sc;
 	sc->sc_intc.ic_establish = plic_intr_establish_fdt;
 	sc->sc_intc.ic_disestablish = plic_intr_disestablish;
-	sc->sc_intc.ic_route = plic_intr_route_ih;
+	sc->sc_intc.ic_route = plic_intr_route;
 	// sc->sc_intc.ic_cpu_enable = XXX Per-CPU Initialization?
 
 	riscv_intr_register_fdt(&sc->sc_intc);
@@ -519,6 +452,23 @@ plic_intr_disestablish(void *cookie)
 }
 
 void
+plic_intr_route(void *cookie, int enable, struct cpu_info *ci)
+{
+	struct plic_softc	*sc = plic;
+	struct plic_intrhand	*ih = cookie;
+
+	int		irq = ih->ih_irq;
+	int		cpu = ci->ci_cpuid;
+	uint32_t 	min_pri = sc->sc_isrcs[irq].is_irq_min;
+
+	if (enable == IRQ_ENABLE) {
+		plic_intr_enable_with_pri(irq, min_pri, cpu);
+	} else {
+		plic_intr_route_grid(irq, IRQ_DISABLE, cpu);
+	}
+}
+
+void
 plic_splx(int new)
 {
 	/* XXX
@@ -569,7 +519,6 @@ void
 plic_setipl(int new)
 {
 	struct cpu_info		*ci = curcpu();
-	struct plic_softc	*sc = plic;
 	uint64_t sie;
 
 	/* disable here is only to keep hardware in sync with ci->ci_cpl */
@@ -577,49 +526,10 @@ plic_setipl(int new)
 	ci->ci_cpl = new;
 
 	/* higher values are higher priority */
-	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
-	    PLIC_THRESHOLD(sc, ci->ci_cpuid), (uint32_t)new);
+	plic_set_threshold(ci->ci_cpuid, new);
+
 	restore_interrupts(sie);
 }
-
-/*
- * turns on/off the route from intr source 'irq'
- * to context 'ci' based on 'enable'
- */
-void
-plic_intr_route(int irq, int enable, struct cpu_info *ci)
-{
-	struct plic_softc	*sc = plic;
-	uint32_t		val, mask;
-
-	if(irq == 0)
-		return;
-
-	KASSERT(ci->ci_cpuid < MAXCPUS);
-
-	mask = (1 << (irq % 32));
-	val = bus_space_read_4(sc->sc_iot, sc->sc_ioh,
-			PLIC_ENABLE(sc, irq, ci->ci_cpuid));
-	if (enable == IRQ_ENABLE)
-		val |= mask;
-	else
-		val &= ~mask;
-
-	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
-			PLIC_ENABLE(sc, irq, ci->ci_cpuid), val);
-}
-
-void
-plic_intr_route_ih(void *cookie, int enable, struct cpu_info *ci)
-{
-	struct plic_intrhand	*ih = cookie;
-
-	if (enable) {
-		plic_intr_enable(ih->ih_irq);
-	}
-	plic_intr_route(ih->ih_irq, enable, ci);
-}
-
  
  /*
   * update the max/min priority for an interrupt src,
@@ -659,13 +569,132 @@ plic_calc_mask(void)
 		/* Enable interrupts at lower levels, clear -> enable */
 		/* Set interrupt priority/enable */
 		if (min != IPL_NONE) {
-			plic_set_priority(irq, min);
-			plic_intr_route(irq, IRQ_ENABLE, ci);
+			plic_intr_enable_with_pri(irq, min, ci->ci_cpuid);
 		} else {
-			plic_intr_disable(irq);
-			plic_intr_route(irq, IRQ_DISABLE, ci);
+			plic_intr_disable(irq, ci->ci_cpuid);
 		}
 	}
 
 	plic_setipl(ci->ci_cpl);
 }
+
+/***************** helper functions *****************/
+
+/*
+ * OpenBSD saves cpu node info in ci struct, so we can search
+ * cpuid by node matching
+ */
+int
+plic_get_cpuid(int intc)
+{
+	uint32_t hart;
+	int parent_node;
+	struct cpu_info *ci;
+	CPU_INFO_ITERATOR cii;
+
+	/* Check the interrupt controller layout. */
+	if (OF_getpropintarray(intc, "#interrupt-cells", &hart,
+	    sizeof(hart)) < 0) {
+		printf(": could not find #interrupt-cells for phandle %u\n", intc);
+		return (-1);
+	}
+
+	/*
+	 * The parent of the interrupt-controller is the CPU we are
+	 * interested in, so search for its OF node index.
+	 */
+	parent_node = OF_parent(intc);
+	CPU_INFO_FOREACH(cii, ci) {
+		if(ci->ci_node == parent_node)
+			return ci->ci_cpuid;
+	}
+	return -1;
+}
+
+/* update priority for intr src 'irq' */
+void
+plic_set_priority(int irq, uint32_t pri)
+{
+	struct plic_softc	*sc = plic;
+	uint32_t		prival;
+
+	/*
+	 * sifive plic only has 0 - 7 priority levels, yet OpenBSD defines
+	 * 0 - 12 priority levels(level 1 - 4 are for SOFT*, level 12
+	 * is for IPI. They should NEVER be passed to plic.
+	 * So we calculate plic priority in the following way:
+	 */
+	if(pri <= 4 || pri >= 12)//invalid input
+		prival = 0;//effectively disable this intr source
+	else
+		prival = pri - 4;
+
+	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
+			PLIC_PRIORITY(irq), prival);
+}
+
+/* update threshold for 'cpu' */
+void
+plic_set_threshold(int cpu, uint32_t threshold)
+{
+	struct plic_softc	*sc = plic;
+	uint32_t		prival;
+
+	if(threshold <= 4 || threshold >= 12)//invalid input
+		prival = 0;//effectively disable this intr source
+	else
+		prival = threshold - 4;
+
+	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
+			PLIC_THRESHOLD(sc, cpu), prival);
+}
+
+/*
+ * turns on/off the route from intr source 'irq'
+ * to context 'ci' based on 'enable'
+ */
+void
+plic_intr_route_grid(int irq, int enable, int cpu)
+{
+	struct plic_softc	*sc = plic;
+	uint32_t		val, mask;
+
+	if(irq == 0)
+		return;
+
+	KASSERT(cpu < MAXCPUS);
+
+	mask = (1 << (irq % 32));
+	val = bus_space_read_4(sc->sc_iot, sc->sc_ioh,
+			PLIC_ENABLE(sc, irq, cpu));
+	if (enable == IRQ_ENABLE)
+		val |= mask;
+	else
+		val &= ~mask;
+
+	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
+			PLIC_ENABLE(sc, irq, cpu), val);
+}
+
+/*
+ * Enable intr src 'irq' to cpu 'cpu' by setting:
+ * - priority
+ * - threshold
+ * - enable bit
+ */
+void
+plic_intr_enable_with_pri(int irq, uint32_t min_pri, int cpu)
+{
+	plic_set_priority(irq, min_pri);
+	plic_set_threshold(cpu, min_pri);
+	plic_intr_route_grid(irq, IRQ_ENABLE, cpu);
+}
+
+void
+plic_intr_disable(int irq, int cpu)
+{
+	plic_set_priority(irq, 0);
+	plic_set_threshold(cpu, 0);
+	plic_intr_route_grid(irq, IRQ_DISABLE, cpu);
+}
+/***************** end of helper functions *****************/
