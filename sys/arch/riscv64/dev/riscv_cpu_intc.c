@@ -81,6 +81,40 @@ riscv_intc_attach(struct device *parent, struct device *self, void *aux)
 	enable_interrupts();
 }
 
+/******** overall spl* routine ********/
+void
+riscv_intc_calc_mask(void)
+{
+
+}
+
+void
+riscv_intc_splx(int new)
+{
+	struct cpu_info *ci = curcpu();
+
+	if (ci->ci_ipending & riscv_smask[new])
+		riscv_do_pending_intr(new);
+
+	panic("riscv_intr_splx unfinished");
+	// XXX undefined?
+	// riscv_intc_setipl(new);
+
+	// XXX deliver newx to plic too ??
+	// plic_splx(new);
+}
+
+int
+riscv_intc_spllower(int new)
+{
+	struct cpu_info *ci = curcpu();
+	int old = ci->ci_cpl;
+	riscv_intc_splx(new);
+	return (old);
+}
+
+
+/* global interrupt handler */
 void
 riscv_intc_irq_handler(void *frame)
 {
@@ -98,7 +132,7 @@ riscv_intc_irq_handler(void *frame)
 #endif
 
 	ih = intc_handler[irq];
-	if (ih->ih_func(frame))
+	if (ih->ih_func(frame) == 0)
 		printf("fail in handleing irq %d\n", irq);
 }
 
@@ -106,13 +140,13 @@ void *
 riscv_intc_intr_establish(int irqno, int dummy_level, int (*func)(void *),
     void *arg, char *name)
 {
-	int psw;
+	int sie;
 	struct intrhand *ih;
 
 	if (irqno < 0 || irqno >= INTC_NIRQS)
 		panic("intc_intr_establish: bogus irqnumber %d: %s",
 		     irqno, name);
-	psw = disable_interrupts();
+	sie = disable_interrupts();
 
 	ih = malloc(sizeof(*ih), M_DEVBUF, M_WAITOK);
 	ih->ih_func = func;
@@ -124,20 +158,20 @@ riscv_intc_intr_establish(int irqno, int dummy_level, int (*func)(void *),
 #ifdef DEBUG_INTC
 	printf("intc_intr_establish irq %d [%s]\n", irqno, name);
 #endif
-	restore_interrupts(psw);
+	restore_interrupts(sie);
 	return (ih);
 }
 
 void
 riscv_intc_intr_disestablish(void *cookie)
 {
-	int psw;
+	int sie;
 	struct intrhand *ih = cookie;
 	int irqno = ih->ih_irq;
-	psw = disable_interrupts();
+	sie = disable_interrupts();
 
 	intc_handler[irqno] = NULL;
 	free(ih, M_DEVBUF, 0);
 
-	restore_interrupts(psw);
+	restore_interrupts(sie);
 }
