@@ -47,6 +47,8 @@
 
 #define	PLIC_ENABLE_BASE	0x002000U
 #define	PLIC_ENABLE_STRIDE	0x80U
+#define	IRQ_ENABLE		1
+#define	IRQ_DISABLE		0
 
 #define	PLIC_CONTEXT_BASE	0x200000U
 #define	PLIC_CONTEXT_STRIDE	0x1000U
@@ -75,10 +77,8 @@ struct plic_intrhand {
 
 struct plic_irqsrc {
 	TAILQ_HEAD(, plic_intrhand) is_list; /* handler list */
-	int 			is_irq;	/* IRQ to mask while handling */
-#if 0
-	struct device		is_dev;	/* from which device this intr comes */
-#endif
+	int 	is_irq_max;	/* IRQ to mask while handling */
+	int 	is_irq_min;	/* lowest IRQ when shared */
 };
 
 struct plic_context {
@@ -111,17 +111,16 @@ void	*plic_intr_establish(int, int, int (*)(void *),
 void	*plic_intr_establish_fdt(void *, int *, int, int (*)(void *),
 		void *, char *);
 void	plic_intr_disestablish(void *);
-void	plic_intr_enable(void *);
-void	plic_intr_disable(void *);
 
 void	plic_splx(int);
 int	plic_spllower(int);
 int	plic_splraise(int);
 void	plic_setipl(int);
 
-// void	plic_calc_mask(void);
-void	plic_intr_route(void *, int, struct cpu_info *);
+void	plic_intr_route_ih(void *, int, struct cpu_info *);
+void	plic_calc_mask(void);
 
+/***************** helper functions *****************/
 
 /*
  * OpenBSD saves cpu node info in ci struct, so we can search
@@ -153,6 +152,46 @@ plic_get_cpuid(int intc)
 	}
 	return -1;
 }
+
+void
+plic_set_priority(int irq, int pri)
+{
+	struct plic_softc	*sc = plic;
+	uint32_t		prival;
+
+	/*
+	 * sifive plic only has 0 - 7 priority levels, yet OpenBSD defines
+	 * 0 - 12 priority levels(level 1 - 4 are for SOFT*, level 12
+	 * is for IPI. They should NEVER be passed to plic.
+	 * So we calculate plic priority in the following way:
+	 */
+	if(pri == 0)
+		prival = 0;//effectively disable this intr source
+
+	if(pri <= 4 || pri >= 12)//invalid input
+		return;
+
+	prival = pri - 4;
+
+	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
+	    PLIC_PRIORITY(irq), prival);
+}
+
+void
+plic_intr_enable(int irq)
+{
+	struct plic_softc	*sc = plic;
+
+	plic_set_priority(irq, sc->sc_isrcs[irq].is_irq_min);
+}
+
+void
+plic_intr_disable(int irq)
+{
+	plic_set_priority(irq, 0);
+}
+
+/***************** end of helper functions *****************/
 
 struct cfattach plic_ca = {
 	sizeof(struct plic_softc), plic_match, plic_attach,
@@ -230,13 +269,10 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 		 * Setup irq;
 		 * Initialize Interrupt Handler List
 		 */
-		isrcs[irq].is_irq = irq;
 		TAILQ_INIT(&isrcs[irq].is_list);
 
 		// Mask interrupt
-		bus_space_write_4(sc->sc_iot, sc->sc_ioh,
-		    PLIC_PRIORITY(irq), 0);
-
+		plic_intr_disable(irq);
 	}
 
 	/*
@@ -333,9 +369,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	sc->sc_intc.ic_cookie = sc;
 	sc->sc_intc.ic_establish = plic_intr_establish_fdt;
 	sc->sc_intc.ic_disestablish = plic_intr_disestablish;
-	sc->sc_intc.ic_enable = plic_intr_enable;
-	sc->sc_intc.ic_disable = plic_intr_disable;
-	// sc->sc_intc.ic_route = plic_intr_route;
+	sc->sc_intc.ic_route = plic_intr_route_ih;
 	// sc->sc_intc.ic_cpu_enable = XXX Per-CPU Initialization?
 
 	riscv_intr_register_fdt(&sc->sc_intc);
@@ -390,7 +424,7 @@ plic_irq_dispatch(uint32_t irq,	void *frame)
 #endif
 
 	sc = plic;
-	pri = sc->sc_isrcs[irq].is_irq;
+	pri = sc->sc_isrcs[irq].is_irq_max;
 	s = plic_splraise(pri);
 	TAILQ_FOREACH(ih, &sc->sc_isrcs[irq].is_list, ih_list) {
 #ifdef MULTIPROCESSOR
@@ -488,39 +522,6 @@ plic_intr_disestablish(void *cookie)
 }
 
 void
-plic_intr_enable(void *cookie)
-{
-	struct plic_softc *sc = plic;
-	struct cpu_info	*ci = curcpu();
-	struct plic_intrhand *ih = cookie;
-	int irq = ih->ih_irq;
-
-#ifdef DEBUG_INTC
-	printf("plic enables irq %d for cpu %d\n", irq, ci->ci_cpuid);
-#endif
-
-	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
-	    PLIC_ENABLE(sc, irq, ci->ci_cpuid), 1);
-}
-
-void
-plic_intr_disable(void *cookie)
-{
-	struct plic_softc *sc = plic;
-	struct cpu_info	*ci = curcpu();
-	struct plic_intrhand *ih = cookie;
-	int irq = ih->ih_irq;
-
-#ifdef DEBUG_INTC
-	printf("plic disables irq %d for cpu %d\n", irq, ci->ci_cpuid);
-#endif
-
-	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
-	    PLIC_ENABLE(sc, irq, ci->ci_cpuid), 0);
-
-}
-
-void
 plic_splx(int new)
 {
 	/* XXX
@@ -584,15 +585,45 @@ plic_setipl(int new)
 	restore_interrupts(sie);
 }
 
-/*******************************************/
+/*
+ * turns on/off the route from intr source 'irq'
+ * to context 'ci' based on 'enable'
+ */
+void
+plic_intr_route(int irq, int enable, struct cpu_info *ci)
+{
+	struct plic_softc	*sc = plic;
+	uint32_t		val, mask;
+
+	if(irq == 0)
+		return;
+
+	KASSERT(ci->ci_cpuid < MAXCPUS);
+
+	mask = (1 << (irq % 32));
+	val = bus_space_read_4(sc->sc_iot, sc->sc_ioh,
+			PLIC_ENABLE(sc, irq, ci->ci_cpuid));
+	if (enable == IRQ_ENABLE)
+		val |= mask;
+	else
+		val &= ~mask;
+
+	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
+			PLIC_ENABLE(sc, irq, ci->ci_cpuid), val);
+}
 
 void
-plic_intr_route(void *cookie, int enable, struct cpu_info *ci)
+plic_intr_route_ih(void *cookie, int enable, struct cpu_info *ci)
 {
-	// XXX TODO
-	panic("plic_intr_route unimplemented");
-	return;
+	struct plic_intrhand	*ih = cookie;
+
+	if (enable) {
+		plic_intr_enable(ih->ih_irq);
+	}
+	plic_intr_route(ih->ih_irq, enable, ci);
 }
+
+/*******************************************/
 
 #if 0
 void
