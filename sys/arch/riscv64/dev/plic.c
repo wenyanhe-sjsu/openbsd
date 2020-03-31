@@ -118,7 +118,8 @@ void	plic_splx(int);
 int	plic_spllower(int);
 int	plic_splraise(int);
 void	plic_setipl(int);
-void	plic_calc_mask(void);
+
+// void	plic_calc_mask(void);
 void	plic_intr_route(void *, int, struct cpu_info *);
 
 
@@ -518,62 +519,20 @@ plic_intr_disable(void *cookie)
 	    PLIC_ENABLE(sc, irq, ci->ci_cpuid), 0);
 
 }
-/*******************************************/
-
-#if 0
-void
-plic_calc_mask(void)
-{
-	struct cpu_info *ci = curcpu();
-	struct plic_softc *sc = plic;
-	int irq;
-	struct plic_intrhand *ih;
-	int i;
-
-	/* PLIC irq 0 is reserved, thus we start from 1 */
-	for (irq = 1; irq < PLIC_MAX_IRQS; irq++) {
-		int max = IPL_NONE;
-		int min = IPL_HIGH;
-		TAILQ_FOREACH(ih, &sc->sc_isrcs[irq].is_list, ih_list) {
-			if (ih->ih_ipl > max)
-				max = ih->ih_ipl;
-
-			if (ih->ih_ipl < min)
-				min = ih->ih_ipl;
-		}
-
-		sc->sc_isrcs[irq].iq_irq = max;
-
-		if (max == IPL_NONE)
-			min = IPL_NONE;
-
-#if 0 // DEBUG_PLIC
-		if (min != IPL_NONE) {
-			printf("irq %d to block at %d %d reg %d bit %d\n",
-			    irq, max, min, INTC_IRQ_TO_REG(irq),
-			    INTC_IRQ_TO_REGi(irq));
-		}
-#endif
-		/* Enable interrupts at lower levels, clear -> enable */
-		for (i = 1; i < min; i++)
-			plic_imask[i] &= ~(1 << (irq));// XXX
-		for (; i <= IPL_HIGH; i++)
-			plic_imask[i] |= (1 << (irq));// XXX
-	}
-	plic_setipl(ci->ci_cpl);
-}
-#endif
 
 void
 plic_splx(int new)
 {
-#if 0	/* XXX how to do pending external interrupt ? */
-	struct cpu_info *ci = curcpu();
-
-	if (ci->ci_ipending & arm_smask[ci->ci_cpl])
-		arm_do_pending_intr(ci->ci_cpl);// this seems to be software interrupt
-#endif
-
+	/* XXX
+	 * how to do pending external interrupt ?
+	 * After set the new threshold, if there is any pending
+	 * external interrupts whose priority is now greater than the
+	 * threshold, they will get passed through plic to cpu,
+	 * trigger a new claim/complete cycle.
+	 * So there is no need to handle pending external intr here.
+	 *
+	 * Pending software intr should be handled in riscv_intc_splx.
+	 */
 	plic_setipl(new);
 }
 
@@ -625,6 +584,8 @@ plic_setipl(int new)
 	restore_interrupts(sie);
 }
 
+/*******************************************/
+
 #if 0	// XXX From arm64/omap/intc.c. Necessary?
 void
 plic_intr_bootstrap(vaddr_t addr)
@@ -648,3 +609,46 @@ plic_intr_route(void *cookie, int enable, struct cpu_info *ci)
 	return;
 }
 
+#if 0
+void
+plic_calc_mask(void)
+{
+	struct cpu_info *ci = curcpu();
+	struct plic_softc *sc = plic;
+	int irq;
+	struct plic_intrhand *ih;
+	int i;
+
+	/* PLIC irq 0 is reserved, thus we start from 1 */
+	for (irq = 1; irq < PLIC_MAX_IRQS; irq++) {
+		int max = IPL_NONE;
+		int min = IPL_HIGH;
+		TAILQ_FOREACH(ih, &sc->sc_isrcs[irq].is_list, ih_list) {
+			if (ih->ih_ipl > max)
+				max = ih->ih_ipl;
+
+			if (ih->ih_ipl < min)
+				min = ih->ih_ipl;
+		}
+
+		sc->sc_isrcs[irq].iq_irq = max;
+
+		if (max == IPL_NONE)
+			min = IPL_NONE;
+
+#if 0 // DEBUG_PLIC
+		if (min != IPL_NONE) {
+			printf("irq %d to block at %d %d reg %d bit %d\n",
+			    irq, max, min, INTC_IRQ_TO_REG(irq),
+			    INTC_IRQ_TO_REGi(irq));
+		}
+#endif
+		/* Enable interrupts at lower levels, clear -> enable */
+		for (i = 1; i < min; i++)
+			plic_imask[i] &= ~(1 << (irq));// XXX
+		for (; i <= IPL_HIGH; i++)
+			plic_imask[i] |= (1 << (irq));// XXX
+	}
+	plic_setipl(ci->ci_cpl);
+}
+#endif
