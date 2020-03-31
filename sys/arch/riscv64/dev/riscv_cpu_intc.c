@@ -28,6 +28,7 @@
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/fdt.h>
 
+#include "riscv64/dev/plic.h"
 #include "riscv_cpu_intc.h"
 
 struct intrhand {
@@ -42,6 +43,17 @@ struct interrupt_controller intc_ic;
 
 int	riscv_intc_match(struct device *, void *, void *);
 void	riscv_intc_attach(struct device *, struct device *, void *);
+
+void	riscv_intc_irq_handler(void *);
+void	*riscv_intc_intr_establish(int, int, int (*)(void *),
+		void *, char *);
+void	riscv_intc_intr_disestablish(void *);
+
+void	riscv_intc_splx(int);
+int	riscv_intc_spllower(int);
+int	riscv_intc_splraise(int);
+void	riscv_intc_setipl(int);
+
 
 struct cfattach        intc_ca = {
        sizeof (struct device), riscv_intc_match, riscv_intc_attach
@@ -65,6 +77,11 @@ riscv_intc_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct fdt_attach_args *faa = aux;/* should only use fa_node field */
 
+	/* hook to intr.c riscv_intr_func */
+	riscv_set_intr_handler(riscv_intc_splraise, riscv_intc_spllower,
+			riscv_intc_splx, riscv_intc_setipl,
+			riscv_intc_irq_handler);
+
 	intc_ic.ic_node = faa->fa_node;
 	intc_ic.ic_cookie = &intc_ic;
 
@@ -77,40 +94,11 @@ riscv_intc_attach(struct device *parent, struct device *self, void *aux)
 
 	riscv_intr_register_fdt(&intc_ic);
 
-	/* XXX right time to enable interrupts ?? */
+	/*
+	 * XXX right time to enable interrupts ??
+	 * might need to postpone untile autoconf is finished
+	 */
 	enable_interrupts();
-}
-
-/******** overall spl* routine ********/
-void
-riscv_intc_calc_mask(void)
-{
-
-}
-
-void
-riscv_intc_splx(int new)
-{
-	struct cpu_info *ci = curcpu();
-
-	if (ci->ci_ipending & riscv_smask[new])
-		riscv_do_pending_intr(new);
-
-	panic("riscv_intr_splx unfinished");
-	// XXX undefined?
-	// riscv_intc_setipl(new);
-
-	// XXX deliver newx to plic too ??
-	// plic_splx(new);
-}
-
-int
-riscv_intc_spllower(int new)
-{
-	struct cpu_info *ci = curcpu();
-	int old = ci->ci_cpl;
-	riscv_intc_splx(new);
-	return (old);
 }
 
 
@@ -174,4 +162,50 @@ riscv_intc_intr_disestablish(void *cookie)
 	free(ih, M_DEVBUF, 0);
 
 	restore_interrupts(sie);
+}
+
+/*
+ * *************** Overall spl* Routine ****************
+ * XXX: the following argument might be wrong:
+ * riscv_cpu_intc has no software priority, irq determines
+ * the priority (lower irq has hight priority).
+ * Therefore there is nothing to enforce to intc, only need
+ * to update ci->ci_cpl, and pass spl to plic.
+ */
+void
+riscv_intc_splx(int new)
+{
+	struct cpu_info *ci = curcpu();
+
+	if (ci->ci_ipending & riscv_smask[new])
+		riscv_do_pending_intr(new);
+
+	riscv_intc_setipl(new);
+}
+
+int
+riscv_intc_spllower(int new)
+{
+	struct cpu_info *ci = curcpu();
+	int old = ci->ci_cpl;
+	riscv_intc_splx(new);
+	return (old);
+}
+
+int
+riscv_intc_splraise(int new)
+{
+	return (plic_splraise(new));
+}
+
+void
+riscv_intc_setipl(int new)
+{
+	plic_setipl(new);
+}
+
+void
+riscv_intc_calc_mask(void)
+{
+
 }
