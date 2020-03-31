@@ -298,13 +298,21 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 
 	KASSERT(faa->fa_nreg > 0);
 
-	ci = malloc(sizeof(*ci), M_DEVBUF, M_WAITOK | M_ZERO);
+	if (faa->fa_reg[0].addr == boot_hart) {/* the primary cpu */
+		ci = &cpu_info_primary;
 #ifdef MULTIPROCESSOR
-	cpu_info[dev->dv_unit] = ci;
-	ci->ci_next = cpu_info_list->ci_next;
-	cpu_info_list->ci_next = ci;
-	ci->ci_flags |= CPUF_AP;
-	ncpus++;
+		ci->ci_flags |= CPUF_RUNNING | CPUF_PRESENT | CPUF_PRIMARY;
+#endif
+	}
+#ifdef MULTIPROCESSOR
+	else {
+		ci = malloc(sizeof(*ci), M_DEVBUF, M_WAITOK | M_ZERO);
+		cpu_info[dev->dv_unit] = ci;
+		ci->ci_next = cpu_info_list->ci_next;
+		cpu_info_list->ci_next = ci;
+		ci->ci_flags |= CPUF_AP;
+		ncpus++;
+	}
 #endif
 
 	ci->ci_dev = dev;
