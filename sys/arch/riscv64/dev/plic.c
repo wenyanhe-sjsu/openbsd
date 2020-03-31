@@ -586,21 +586,6 @@ plic_setipl(int new)
 
 /*******************************************/
 
-#if 0	// XXX From arm64/omap/intc.c. Necessary?
-void
-plic_intr_bootstrap(vaddr_t addr)
-{
-	int i, j;
-	extern struct bus_space armv7_bs_tag;
-	plic_iot = &armv7_bs_tag;
-	plic_ioh = addr;
-	for (i = 0; i < INTC_NUM_BANKS; i++)
-		for (j = 0; j < NIPL; j++)
-			plic_imask[i][j] = 0xffffffff;
-}
-#endif
-
-
 void
 plic_intr_route(void *cookie, int enable, struct cpu_info *ci)
 {
