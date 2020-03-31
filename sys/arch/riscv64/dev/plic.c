@@ -104,11 +104,6 @@ struct plic_softc *plic = NULL;
 
 int	plic_match(struct device *, void *, void *);
 void	plic_attach(struct device *, struct device *, void *);
-void	plic_splx(int);
-int	plic_spllower(int);
-int	plic_splraise(int);
-void	plic_setipl(int);
-void	plic_calc_mask(void);
 int	plic_irq_handler(void *);
 int	plic_irq_dispatch(uint32_t, void *);
 void	*plic_intr_establish(int, int, int (*)(void *),
@@ -116,6 +111,14 @@ void	*plic_intr_establish(int, int, int (*)(void *),
 void	*plic_intr_establish_fdt(void *, int *, int, int (*)(void *),
 		void *, char *);
 void	plic_intr_disestablish(void *);
+void	plic_intr_enable(void *);
+void	plic_intr_disable(void *);
+
+void	plic_splx(int);
+int	plic_spllower(int);
+int	plic_splraise(int);
+void	plic_setipl(int);
+void	plic_calc_mask(void);
 void	plic_intr_route(void *, int, struct cpu_info *);
 
 
@@ -329,8 +332,8 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	sc->sc_intc.ic_cookie = sc;
 	sc->sc_intc.ic_establish = plic_intr_establish_fdt;
 	sc->sc_intc.ic_disestablish = plic_intr_disestablish;
-	// sc->sc_intc.ic_enable = XXX;
-	// sc->sc_intc.ic_disable = XXX;
+	sc->sc_intc.ic_enable = plic_intr_enable;
+	sc->sc_intc.ic_disable = plic_intr_disable;
 	// sc->sc_intc.ic_route = plic_intr_route;
 	// sc->sc_intc.ic_cpu_enable = XXX Per-CPU Initialization?
 
@@ -481,6 +484,39 @@ plic_intr_disestablish(void *cookie)
 		evcount_detach(&ih->ih_count);
 	free(ih, M_DEVBUF, 0);
 	restore_interrupts(sie);
+}
+
+void
+plic_intr_enable(void *cookie)
+{
+	struct plic_softc *sc = plic;
+	struct cpu_info	*ci = curcpu();
+	struct plic_intrhand *ih = cookie;
+	int irq = ih->ih_irq;
+
+#ifdef DEBUG_INTC
+	printf("plic enables irq %d for cpu %d\n", irq, ci->ci_cpuid);
+#endif
+
+	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
+	    PLIC_ENABLE(sc, irq, ci->ci_cpuid), 1);
+}
+
+void
+plic_intr_disable(void *cookie)
+{
+	struct plic_softc *sc = plic;
+	struct cpu_info	*ci = curcpu();
+	struct plic_intrhand *ih = cookie;
+	int irq = ih->ih_irq;
+
+#ifdef DEBUG_INTC
+	printf("plic disables irq %d for cpu %d\n", irq, ci->ci_cpuid);
+#endif
+
+	bus_space_write_4(sc->sc_iot, sc->sc_ioh,
+	    PLIC_ENABLE(sc, irq, ci->ci_cpuid), 0);
+
 }
 /*******************************************/
 
