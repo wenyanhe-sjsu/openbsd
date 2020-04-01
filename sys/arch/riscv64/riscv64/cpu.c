@@ -194,7 +194,7 @@ cpu_identify(struct cpu_info *ci)
 
 	cpu = cpu_number();
 
-	caps = mallocarray(256, sizeof(uint64_t), M_FREE, M_ZERO | M_NOWAIT);
+	caps = mallocarray(256, sizeof(uint64_t), M_DEVBUF, M_ZERO | M_WAITOK);
 
 	// identify vendor
 	impl_id	= CPU_IMPL(mimpid);
