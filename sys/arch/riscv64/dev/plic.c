@@ -630,7 +630,7 @@ plic_set_threshold(int cpu, uint32_t threshold)
 	uint32_t		prival;
 
 	if(threshold <= 4 || threshold >= 12)//invalid input
-		prival = 0;//effectively disable this intr source
+		prival = IPL_HIGH - 4;//effectively disable this intr source
 	else
 		prival = threshold - 4;
 
