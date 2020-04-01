@@ -23,7 +23,6 @@
 #include <machine/cpu.h>
 #include <machine/intr.h>
 #include <machine/frame.h>
-#include "riscv64/dev/riscv_cpu_intc.h"
 
 #include <dev/ofw/openfirm.h>
 
@@ -51,7 +50,7 @@ struct riscv_intr_func riscv_intr_func = {
 	riscv_dflt_setipl
 };
 
-void (*riscv_ext_intr_dispatch)(void *) = riscv_dflt_intr;
+void (*riscv_intr_dispatch)(void *) = riscv_dflt_intr;
 
 void
 riscv_cpu_intr(void *frame)
@@ -59,7 +58,7 @@ riscv_cpu_intr(void *frame)
 	struct cpu_info	*ci = curcpu();
 
 	ci->ci_idepth++;
-	riscv_intc_irq_handler(frame);
+	riscv_intr_dispatch(frame);
 	ci->ci_idepth--;
 }
 
@@ -429,15 +428,18 @@ riscv_do_pending_intr(int pcpl)
 	restore_interrupts(sie);
 }
 
-void riscv_set_intr_handler(int (*raise)(int), int (*lower)(int),
-    void (*x)(int), void (*setipl)(int),
-	void (*intr_handle)(void *))
+void riscv_set_intr_func(int (*raise)(int), int (*lower)(int),
+    void (*x)(int), void (*setipl)(int))
 {
 	riscv_intr_func.raise		= raise;
 	riscv_intr_func.lower		= lower;
 	riscv_intr_func.x		= x;
 	riscv_intr_func.setipl		= setipl;
-	riscv_ext_intr_dispatch		= intr_handle;
+}
+
+void riscv_set_intr_handler(void (*intr_handle)(void *))
+{
+	riscv_intr_dispatch		= intr_handle;
 }
 
 void

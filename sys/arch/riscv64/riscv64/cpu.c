@@ -182,7 +182,7 @@ cpu_identify(struct cpu_info *ci)
 	uint64_t misa;
 	int cpu, i, node, len;
 
-	uint64_t caps[256] = {0};
+	uint64_t *caps;
 	uint64_t hwcap;
 	char isa[ISA_NAME_MAXLEN];
 
@@ -193,6 +193,8 @@ cpu_identify(struct cpu_info *ci)
 	misa = (0x3ul << CPU_PART_SHIFT);// for virt
 
 	cpu = cpu_number();
+
+	caps = mallocarray(256, sizeof(uint64_t), M_DEVBUF, M_ZERO | M_WAITOK);
 
 	// identify vendor
 	impl_id	= CPU_IMPL(mimpid);
