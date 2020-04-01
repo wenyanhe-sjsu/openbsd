@@ -144,7 +144,7 @@ riscv_intc_intr_establish(int irqno, int dummy_level, int (*func)(void *),
 
 	intc_handler[irqno] = ih;
 #ifdef DEBUG_INTC
-	printf("intc_intr_establish irq %d [%s]\n", irqno, name);
+	printf("\nintc_intr_establish irq %d [%s]\n", irqno, name);
 #endif
 	restore_interrupts(sie);
 	return (ih);
