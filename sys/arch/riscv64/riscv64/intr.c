@@ -428,14 +428,17 @@ riscv_do_pending_intr(int pcpl)
 	restore_interrupts(sie);
 }
 
-void riscv_set_intr_handler(int (*raise)(int), int (*lower)(int),
-    void (*x)(int), void (*setipl)(int),
-	void (*intr_handle)(void *))
+void riscv_set_intr_func(int (*raise)(int), int (*lower)(int),
+    void (*x)(int), void (*setipl)(int))
 {
 	riscv_intr_func.raise		= raise;
 	riscv_intr_func.lower		= lower;
 	riscv_intr_func.x		= x;
 	riscv_intr_func.setipl		= setipl;
+}
+
+void riscv_set_intr_handler(void (*intr_handle)(void *))
+{
 	riscv_intr_dispatch		= intr_handle;
 }
 
