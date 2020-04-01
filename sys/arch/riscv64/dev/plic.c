@@ -170,7 +170,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	if (plic_attached)
 		return;
 
-	sc = (struct plic_softc *)dev;
+	plic = sc = (struct plic_softc *)dev;
 	faa = (struct fdt_attach_args *)aux;
 
 	if (faa->fa_nreg < 1)
@@ -296,7 +296,6 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 			plic_splx, plic_setipl);
 
 	plic_attached = 1;
-	plic = sc;
 
 	/* enable external interrupt */
 	csr_set(sie, SIE_SEIE);
