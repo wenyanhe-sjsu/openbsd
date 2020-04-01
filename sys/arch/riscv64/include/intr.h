@@ -110,9 +110,9 @@ void	 splx(int);
 
 void	 riscv_cpu_intr(void *);
 void	 riscv_do_pending_intr(int);
-void	 riscv_set_intr_handler(int (*raise)(int), int (*lower)(int),
-    void (*x)(int), void (*setipl)(int),
-    void (*intr_handle)(void *));
+void	 riscv_set_intr_func(int (*raise)(int), int (*lower)(int),
+    void (*x)(int), void (*setipl)(int));
+void	 riscv_set_intr_handler(void (*intr_handle)(void *));
 
 struct riscv_intr_func {
 	int (*raise)(int);
