@@ -77,6 +77,8 @@ riscv_intc_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct fdt_attach_args *faa = aux;/* should only use fa_node field */
 
+	riscv_init_smask();
+
 	/* hook to intr.c riscv_intr_func */
 	riscv_set_intr_handler(riscv_intc_splraise, riscv_intc_spllower,
 			riscv_intc_splx, riscv_intc_setipl,
