@@ -286,7 +286,7 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	 * global interrupt handler vector
 	 */
 	riscv_intc_intr_establish(IRQ_EXTERNAL_SUPERVISOR, 0,
-			plic_irq_handler, NULL, "plic");
+			plic_irq_handler, NULL, "plic0");
 
 	/*
 	 * From now on, spl update must be enforeced to plic, so
@@ -686,7 +686,7 @@ void
 plic_intr_enable_with_pri(int irq, uint32_t min_pri, int cpu)
 {
 	plic_set_priority(irq, min_pri);
-	plic_set_threshold(cpu, min_pri);
+	plic_set_threshold(cpu, min_pri-1);
 	plic_intr_route_grid(irq, IRQ_ENABLE, cpu);
 }
 
