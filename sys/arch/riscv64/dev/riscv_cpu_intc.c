@@ -79,10 +79,8 @@ riscv_intc_attach(struct device *parent, struct device *self, void *aux)
 
 	riscv_init_smask();
 
-	/* hook to intr.c riscv_intr_func */
-	riscv_set_intr_handler(riscv_intc_splraise, riscv_intc_spllower,
-			riscv_intc_splx, riscv_intc_setipl,
-			riscv_intc_irq_handler);
+	/* hook the intr_handler */
+	riscv_set_intr_handler(riscv_intc_irq_handler);
 
 	intc_ic.ic_node = faa->fa_node;
 	intc_ic.ic_cookie = &intc_ic;
@@ -164,46 +162,6 @@ riscv_intc_intr_disestablish(void *cookie)
 	free(ih, M_DEVBUF, 0);
 
 	restore_interrupts(sie);
-}
-
-/*
- * *************** Overall spl* Routine ****************
- * XXX: the following argument might be wrong:
- * riscv_cpu_intc has no software priority, irq determines
- * the priority (lower irq has hight priority).
- * Therefore there is nothing to enforce to intc, only need
- * to update ci->ci_cpl, and pass spl to plic.
- */
-void
-riscv_intc_splx(int new)
-{
-	struct cpu_info *ci = curcpu();
-
-	if (ci->ci_ipending & riscv_smask[new])
-		riscv_do_pending_intr(new);
-
-	riscv_intc_setipl(new);
-}
-
-int
-riscv_intc_spllower(int new)
-{
-	struct cpu_info *ci = curcpu();
-	int old = ci->ci_cpl;
-	riscv_intc_splx(new);
-	return (old);
-}
-
-int
-riscv_intc_splraise(int new)
-{
-	return (plic_splraise(new));
-}
-
-void
-riscv_intc_setipl(int new)
-{
-	plic_setipl(new);
 }
 
 void
