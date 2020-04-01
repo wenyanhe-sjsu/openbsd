@@ -288,6 +288,13 @@ plic_attach(struct device *parent, struct device *dev, void *aux)
 	riscv_intc_intr_establish(IRQ_EXTERNAL_SUPERVISOR, 0,
 			plic_irq_handler, NULL, "plic");
 
+	/*
+	 * From now on, spl update must be enforeced to plic, so
+	 * spl* routine should be updated.
+	 */
+	riscv_set_intr_func(plic_splraise, plic_spllower,
+			plic_splx, plic_setipl);
+
 	plic_attached = 1;
 	plic = sc;
 
@@ -468,8 +475,13 @@ plic_splx(int new)
 	 * trigger a new claim/complete cycle.
 	 * So there is no need to handle pending external intr here.
 	 *
-	 * Pending software intr should be handled in riscv_intc_splx.
 	 */
+	struct cpu_info *ci = curcpu();
+
+	/* Pending software intr is handled here */
+	if (ci->ci_ipending & riscv_smask[new])
+		riscv_do_pending_intr(new);
+
 	plic_setipl(new);
 }
 
