@@ -17,8 +17,6 @@
 * DDB
     * Completely unimplemented. Don't expect it to work.
 * PMAP
-    * Do not expect page table switch to work yet.
-    * PMAP structure's pm\_mode is not set. This will definitely cause issues later.
     * Consolidate pm\_mode / pm\_asid / pm\_ppn into single var -- pm\_satp?
     * Physmap vars necessary in bootconfig.h?
 * Interrupts
