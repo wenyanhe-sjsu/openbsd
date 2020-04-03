@@ -49,11 +49,6 @@ void	*riscv_intc_intr_establish(int, int, int (*)(void *),
 		void *, char *);
 void	riscv_intc_intr_disestablish(void *);
 
-void	riscv_intc_splx(int);
-int	riscv_intc_spllower(int);
-int	riscv_intc_splraise(int);
-void	riscv_intc_setipl(int);
-
 
 struct cfattach        intc_ca = {
        sizeof (struct device), riscv_intc_match, riscv_intc_attach
@@ -162,10 +157,4 @@ riscv_intc_intr_disestablish(void *cookie)
 	free(ih, M_DEVBUF, 0);
 
 	restore_interrupts(sie);
-}
-
-void
-riscv_intc_calc_mask(void)
-{
-
 }
