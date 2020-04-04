@@ -41,11 +41,11 @@ ENTRY(cpu_switchto)
 	sd	s9, (SF_S + 9 * 8)(sp)
 	sd	s10, (SF_S + 10 * 8)(sp)
 	sd	s11, (SF_S + 11 * 8)(sp)
+	sd	ra, SF_RA(sp)
 
 	// store switchframe
 	ld	a5, CI_CURPCB(tp)
 	sd	sp, PCB_SP(a5)
-	// XXX do we need to save return address?
 
 	// XXX store fpu, if necessary
 
@@ -83,6 +83,7 @@ ENTRY(cpu_switchto)
 	ld	s9, (SF_S + 9 * 8)(sp)
 	ld	s10, (SF_S + 10 * 8)(sp)
 	ld	s11, (SF_S + 11 * 8)(sp)
+	ld	ra, SF_RA(sp)
 
 	// XXX restore fpu, if necessary
 
@@ -90,5 +91,21 @@ ENTRY(cpu_switchto)
 	addi	sp, sp, SWITCHFRAME_SIZEOF
 	RETGUARD_CHECK(cpu_switchto, a7)
 	ret
+END(cpu_switch)
+
+
+ENTRY(proc_trampoline)
+#ifdef MULTIPROCESSOR
+	t0	_C_LABEL(proc_trampoline_mp)
+	jr	t0
+#endif
+	// call it or just set the variable?
+	li	a0, IPL_NONE
+	la	t0, spllower
+	jalr	t0
+	mv	a0, s1
+	jalr	s0
+	la	t0, syscall_return
+	jr	t0
 END(cpu_switch)
 

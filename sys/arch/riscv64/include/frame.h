@@ -82,6 +82,7 @@ struct sigframe {
  */
 struct switchframe {
 	int64_t sf_s[12];
+	int64_t sf_ra;
 };
 
 struct callframe {
