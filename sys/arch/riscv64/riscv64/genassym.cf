@@ -59,6 +59,9 @@ member	tf_scause
 
 struct	switchframe
 member	sf_s
+member	sf_ra
+
+export	IPL_NONE
 
 struct	proc
 member	p_stat

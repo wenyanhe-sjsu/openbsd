@@ -217,6 +217,10 @@ void need_resched(struct cpu_info *);
  */
 #define	need_proftick(p)	aston(p)
 
+// asm code to start new kernel contexts.
+void	proc_trampoline(void);
+void	child_trampoline(void);
+
 /*
  * Random cruft
  */
