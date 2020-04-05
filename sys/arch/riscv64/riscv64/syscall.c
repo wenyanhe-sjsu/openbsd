@@ -60,10 +60,8 @@ svc_handler(trapframe_t *frame)
 		enable_interrupts();
 #endif
 
-	// System call number in a7
-	code = frame->tf_a[7];
-
-	ap = &frame->tf_a[0];
+	ap = &frame->tf_a[0]; // Pointer to first arg
+	code = frame->tf_t[0]; // Syscall code
 	callp = p->p_p->ps_emul->e_sysent;
 
 	switch (code) {	
@@ -103,28 +101,20 @@ svc_handler(trapframe_t *frame)
 	case 0:
 		frame->tf_a[0] = rval[0];
 		frame->tf_a[1] = rval[1];
-
-		// XXX How to signal error?
-		// frame->tf_spsr &= ~PSR_C;	/* carry bit */
+		frame->tf_t[0] = 0;		/* syscall succeeded */
 		break;
 
 	case ERESTART:
-		/*
-		 * Reconstruct the pc to point at the svc.
-		 */
-		// XXX Does sepc get propagated back to pc register?
-		frame->tf_sepc -= 4;
+		frame->tf_sepc -= 4;		/* prev instruction */
 		break;
 
 	case EJUSTRETURN:
-		/* nothing to do */
 		break;
 
 	default:
 	bad:
 		frame->tf_a[0] = error;
-		// XXX How to signal error?
-		// frame->tf_spsr |= PSR_C;	/* carry bit */
+		frame->tf_t[0] = 1;		/* syscall error */
 		break;
 	}
 
