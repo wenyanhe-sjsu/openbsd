@@ -267,7 +267,7 @@ mainbus_attach_cpus(struct device *self, cfmatch_t match)
 			ncpusfound++;
 
 #ifdef DEBUG_AUTOCONF
-	       printf("scanning cpus subnode: %d\n", node);
+                printf("scanning cpus subnode: %d\n", node);
 #endif
 		mainbus_attach_node(self, node, match);
 	}

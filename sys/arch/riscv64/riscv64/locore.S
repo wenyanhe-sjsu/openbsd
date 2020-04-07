@@ -51,7 +51,7 @@ _start_kern_bootstrap:
 		/* Set the global pointer */
 .option push
 .option norelax
-	lla	gp, __global_pointer$		//XXX where?
+	lla	gp, __global_pointer$
 .option pop
 
 	/* Get the physical address kernel loaded to */ 
@@ -59,7 +59,7 @@ _start_kern_bootstrap:
 	ld	t1, 0(t0)	//load Double-word data. XXX WHEN is (t0) filled
 	sub	t1, t1, t0	//t1 = t1 - t0 = va - pa, va<-->pa offset
 	li	t2, KERNBASE	//load immediate, KERNBASE is virtual addr
-	sub	s9, t2, t1	// s9 = physmem base of kernel
+	sub	s9, t2, t1	//s9 = physmem base of kernel
 
 	//registers passed by bbl.
 	/* 
@@ -73,7 +73,7 @@ _start_kern_bootstrap:
 	//atomic memory operation, read-modify-write: 
 		//only the first hart can read 0 and modify it to 1, 
 		//all other harts will read 1.
-	amoadd.w t2, t1, (t0)	//XXX changed first operand from t0 to t2,affecting line82
+	amoadd.w t2, t1, (t0)	//changed first operand from t0 to t2,affecting line82
 	
 	/*
 	 * We must jump to mpentry in the non-BSP case because the offset is
@@ -245,7 +245,7 @@ va:					//XXX just a trampoline?
 	bltu	s0, s1, 1b
 
 	/* Store boot hart id. */
-	la	t0, boot_hart	//defined in machdep.c, the hart we booted on.
+	la	t0, boot_hart	//the hart we booted on.
 	sw	a0, 0(t0)	//all above logic runs on this a0 hart.
 
 	/* Fill riscv_bootparams */
@@ -269,7 +269,7 @@ va:					//XXX just a trampoline?
 	call	_C_LABEL(initriscv)	// Off we go, defined in machdep.c
 	call	_C_LABEL(main)		//defined in openbsd/kern/init_main.c
 
-	.data//XXX otherwise would fall into text region
+	.data                   //otherwise would fall into text region
 	.align  4
 initstack:
 	.space  (PAGE_SIZE * KSTACK_PAGES)
@@ -284,14 +284,14 @@ sigfillsiz:
 	.data
 	.quad	esigfill - sigfill
 
-	.text//XXX right place to restart text
+	.text               //right place to restart text
 ENTRY(sigcode)
        mv      a0, sp
        addi    a0, a0, SF_SC //actual saved context
 
 1:
        li      t0, SYS_sigreturn
-       ecall  //make a system call from a lower privilege level to a higher mode
+       ecall                //make a syscall from lower privilege to higher
 	
        .globl _C_LABEL(sigcoderet)
 _C_LABEL(sigcoderet):
@@ -320,7 +320,7 @@ _C_LABEL(esym): .quad	_C_LABEL(end)
 	.align	12
 pagetable_l1:
 	.space	PAGE_SIZE
-	.globl	pagetable_l2	// Used in pmap.c
+	.globl	pagetable_l2
 pagetable_l2:
 	.space	PAGE_SIZE
 pagetable_l2_devmap:
@@ -347,6 +347,7 @@ END(mpentry)
  * mpentry(unsigned long)
  *
  * Called by a core / hart when it is being brought online.
+ * XXX: [CMPE] This needs to be updated
  */
 ENTRY(mpentry)
 	/*
@@ -405,7 +406,7 @@ mpva:
 	li	t0, 0
 	csrw	sscratch, t0		//Scratch Register for Supervisor Mode Trap Handler
 
-	call	init_secondary		//defined in freebsd/machine/mp_machdep.c
+	call	init_secondary
 END(mpentry)
 #endif
 
