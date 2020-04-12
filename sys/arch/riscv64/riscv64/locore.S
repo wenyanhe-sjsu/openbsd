@@ -222,7 +222,7 @@ va:					//XXX just a trampoline?
 
 
 	/* Setup supervisor trap vector */
-	la	t0, cpu_exception_handler	//-->where the real setup happens
+	la	t0, cpu_trap_handler	//-->where the real setup happens
 	csrw	stvec, t0
 
 	/* Ensure sscratch is zero */
@@ -399,7 +399,7 @@ mpva:
 .option pop
 
 	/* Setup supervisor trap vector */
-	la	t0, cpu_exception_handler
+	la	t0, cpu_trap_handler
 	csrw	stvec, t0
 
 	/* Ensure sscratch is zero */
