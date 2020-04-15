@@ -264,20 +264,9 @@ virtio_mbh_io(int dir, uint16_t reg, uint32_t *data, uint8_t *intr,
 {
 	*intr = 0xFF;
 
-
 	// dir == 0 means writing
 	if (dir == 0) {
 		switch (reg) {
-		//case VIRTIO_BALLOON_F_MUST_TELL_HOST:
-		//	log_warnx("%s: illegal write %x to %s",
-		//	    __progname, *data, virtio_reg_name(reg));
-		//	break;
-		case VIRTIO_BALLOON_F_STATS_VQ:
-            break;
-		//case VIRTIO_BALLOON_F_DEFLATE_ON_OOM:
-		//	log_warnx("%s: illegal write %x to %s",
-		//	    __progname, *data, virtio_reg_name(reg));
-		//	break;
 		case VIRTIO_CONFIG_DEVICE_FEATURES:
 		case VIRTIO_CONFIG_QUEUE_SIZE:
 		case VIRTIO_CONFIG_ISR_STATUS:
@@ -303,20 +292,12 @@ virtio_mbh_io(int dir, uint16_t reg, uint32_t *data, uint8_t *intr,
 		case VIRTIO_CONFIG_DEVICE_STATUS:
 			viombh.cfg.device_status = *data;
 			break;
+		case VIRTIO_CONFIG_DEVICE_CONFIG_NOMSI + 4:
+			viombh.actual = *data;
+			break;
 		}
 	} else {
 		switch (reg) {
-
-		//case VIRTIO_BALLOON_F_MUST_TELL_HOST:
-		//	*data = viombh.cfg.device_feature;
-		//	break;
-		case VIRTIO_BALLOON_F_STATS_VQ:
-			*data = viombh.cfg.guest_feature;
-			break;
-		//case VIRTIO_BALLOON_F_DEFLATE_ON_OOM:
-		//	*data = viombh.cfg.queue_address;
-		//	break;
-
 		case VIRTIO_CONFIG_DEVICE_FEATURES:
 			*data = viombh.cfg.device_feature;
 			break;
@@ -342,6 +323,12 @@ virtio_mbh_io(int dir, uint16_t reg, uint32_t *data, uint8_t *intr,
 			*data = viombh.cfg.isr_status;
 			viombh.cfg.isr_status = 0;
 			vcpu_deassert_pic_irq(viombh.vm_id, 0, viombh.irq);
+			break;
+		case VIRTIO_CONFIG_DEVICE_CONFIG_NOMSI:
+			*data = viombh.num_pages;
+			break;
+		case VIRTIO_CONFIG_DEVICE_CONFIG_NOMSI + 4:
+			*data = viombh.actual;
 			break;
 		}
 	}
@@ -2650,10 +2637,11 @@ virtio_start(struct vm_create_params *vcp)
 void
 viombh_do_inflate(struct vmd_vm *vm)
 {
-	// update num_pages register
-	// viombh.num_pages = ??
+	viombh.num_pages = 40;
 
-	// send interrupt to VM
-	// vcpu_assert_pic_irq(vm_id, vcpu_id (always 0), viombh.irq);
-
+	if (viombh.num_pages > viombh.actual) {
+		printf("%s: intr\n", __func__);
+		viombh.cfg.isr_status |= VIRTIO_CONFIG_ISR_CONFIG_CHANGE;
+		vcpu_assert_pic_irq(viombh.vm_id, 0, viombh.irq);
+	}
 }
