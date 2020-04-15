@@ -671,8 +671,8 @@ viomb_stats_intr(struct virtqueue *vq)
 		return(1);
 
 	bus_dmamap_sync(vsc->sc_dmat, sc->sc_stats_dmamap, 0,
-			VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat),
-			BUS_DMASYNC_POSTWRITE);
+	    VIOMB_STATS_MAX * sizeof(struct virtio_balloon_stat),
+	    BUS_DMASYNC_POSTWRITE);
 
 	task_add(sc->sc_stats_taskq, &sc->sc_stats_task);
 
