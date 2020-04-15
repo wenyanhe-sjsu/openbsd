@@ -256,18 +256,22 @@ vm_balloon_thread_fn(void *p)
 {
 	struct vm_inswap_balloon vib;
 	struct vmd_vm *vm = (struct vmd_vm *)p;
+	int ct = 0;
 
 	log_debug("created balloon monitor thread");
 	memset(&vib, 0, sizeof(vib));
 
 	for (;;) {
+		ct++;
 		sleep(1);
 		if (ioctl(env->vmd_fd, VMM_IOC_BALLOON, &vib) == -1) {
 			log_warn("balloon ioctl failed: %s",
 			    strerror(errno));
-		} else if (vib.vib_host_is_swapping) {
+		} else if (vib.vib_host_is_swapping || ct > 120) {
 			log_debug("host in swap, requesting inflate");
 			viombh_do_inflate(vm);
+		} else {
+			log_debug("host not in swap");
 		}
 	}
 
