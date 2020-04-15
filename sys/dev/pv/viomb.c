@@ -231,7 +231,7 @@ viomb_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_vq[VQ_STATS].vq_done = viomb_stats_intr;
 	virtio_start_vq_intr(vsc, &sc->sc_vq[VQ_INFLATE]);
 	virtio_start_vq_intr(vsc, &sc->sc_vq[VQ_DEFLATE]);
-	virtio_start_vq_intr(vsc, &sc->sc_vq[VQ_STATS]);
+//	virtio_start_vq_intr(vsc, &sc->sc_vq[VQ_STATS]);
 
 	viomb_read_config(sc);
 	TAILQ_INIT(&sc->sc_balloon_pages);
@@ -345,13 +345,13 @@ viomb_worker(void *arg1)
 	s = splbio();
 	viomb_read_config(sc);
 	if (sc->sc_npages > sc->sc_actual){
-		VIOMBDEBUG(sc, "inflating balloon from %u to %u.\n",
-			   sc->sc_actual, sc->sc_npages);
+		printf("%s: inflating balloon from %u to %u.\n", __func__,
+		   sc->sc_actual, sc->sc_npages);
 		viomb_inflate(sc);
 		}
 	else if (sc->sc_npages < sc->sc_actual){
-		VIOMBDEBUG(sc, "deflating balloon from %u to %u.\n",
-			   sc->sc_actual, sc->sc_npages);
+		printf("%s: deflating balloon from %u to %u.\n", __func__,
+		   sc->sc_actual, sc->sc_npages);
 		viomb_deflate(sc);
 	}
 
@@ -379,6 +379,9 @@ viomb_stats_worker(void *arg1)
 
 	printf("%s: leaving\n", __func__);
 	splx(s);
+
+	// XXX investigate why there is a stuck irq without this?
+	task_del(sc->sc_stats_taskq, &sc->sc_stats_task);
 }
 
 /*
