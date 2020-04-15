@@ -539,6 +539,11 @@ struct vm_intr_params {
 	uint16_t		vip_intr;
 };
 
+struct vm_inswap_balloon {
+	/* Output parameters from VMM_IOC_BALLOON */
+	int			vib_host_is_swapping;
+};
+
 #define VM_RWVMPARAMS_PVCLOCK_SYSTEM_GPA 0x1	/* read/write pvclock gpa */
 #define VM_RWVMPARAMS_PVCLOCK_VERSION	 0x2	/* read/write pvclock version */
 #define VM_RWVMPARAMS_ALL	(VM_RWVMPARAMS_PVCLOCK_SYSTEM_GPA | \
@@ -596,6 +601,8 @@ struct vm_mprotect_ept_params {
 #define VMM_IOC_WRITEVMPARAMS _IOW('V', 10, struct vm_rwvmparams_params)
 /* Control the protection of ept pages*/
 #define VMM_IOC_MPROTECT_EPT _IOW('V', 11, struct vm_mprotect_ept_params)
+/* Check if host is about to swap */
+#define VMM_IOC_BALLOON _IOWR('V', 12, struct vm_inswap_balloon)
 
 /* CPUID masks */
 /*
