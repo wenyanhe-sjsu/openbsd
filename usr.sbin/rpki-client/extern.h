@@ -1,4 +1,4 @@
-/*	$OpenBSD: extern.h,v 1.23 2019/12/06 09:27:12 claudio Exp $ */
+/*	$OpenBSD: extern.h,v 1.27 2020/04/01 14:15:49 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -264,6 +264,7 @@ struct cert	*cert_read(int);
 void		 mft_buffer(char **, size_t *, size_t *, const struct mft *);
 void		 mft_free(struct mft *);
 struct mft	*mft_parse(X509 **, const char *, int);
+int		 mft_check(const char *, struct mft *);
 struct mft	*mft_read(int);
 
 void		 roa_buffer(char **, size_t *, size_t *, const struct roa *);
@@ -370,11 +371,10 @@ extern int	 outformats;
 extern char*	 outputdir;
 
 int		 outputfiles(struct vrp_tree *v);
-FILE		*output_createtmp(char *);
-void		 output_cleantmp(void);
-void		 output_finish(FILE *);
 int		 output_bgpd(FILE *, struct vrp_tree *);
-int		 output_bird(FILE *, struct vrp_tree *);
+int		 output_bird1v4(FILE *, struct vrp_tree *);
+int		 output_bird1v6(FILE *, struct vrp_tree *);
+int		 output_bird2(FILE *, struct vrp_tree *);
 int		 output_csv(FILE *, struct vrp_tree *);
 int		 output_json(FILE *, struct vrp_tree *);
 

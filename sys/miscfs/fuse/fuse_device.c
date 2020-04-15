@@ -1,4 +1,4 @@
-/* $OpenBSD: fuse_device.c,v 1.30 2019/12/31 13:48:32 visa Exp $ */
+/* $OpenBSD: fuse_device.c,v 1.33 2020/04/07 13:27:51 visa Exp $ */
 /*
  * Copyright (c) 2012-2013 Sylvestre Gallon <ccna.syl@gmail.com>
  *
@@ -70,14 +70,14 @@ int	filt_fuse_read(struct knote *, long);
 void	filt_fuse_rdetach(struct knote *);
 
 const static struct filterops fuse_rd_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_fuse_rdetach,
 	.f_event	= filt_fuse_read,
 };
 
 const static struct filterops fuse_seltrue_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_fuse_rdetach,
 	.f_event	= filt_seltrue,
@@ -523,7 +523,7 @@ fusepoll(dev_t dev, int events, struct proc *p)
 
 	fd = fuse_lookup(minor(dev));
 	if (fd == NULL)
-		return (EINVAL);
+		return (POLLERR);
 
 	if (events & (POLLIN | POLLRDNORM))
 		if (!SIMPLEQ_EMPTY(&fd->fd_fbufs_in))
@@ -564,7 +564,7 @@ fusekqfilter(dev_t dev, struct knote *kn)
 
 	kn->kn_hook = fd;
 
-	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	klist_insert(klist, kn);
 
 	return (0);
 }
@@ -575,7 +575,7 @@ filt_fuse_rdetach(struct knote *kn)
 	struct fuse_d *fd = kn->kn_hook;
 	struct klist *klist = &fd->fd_rsel.si_note;
 
-	SLIST_REMOVE(klist, kn, knote, kn_selnext);
+	klist_remove(klist, kn);
 }
 
 int

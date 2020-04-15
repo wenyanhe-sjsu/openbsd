@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf.c,v 1.186 2020/01/27 19:16:43 jcs Exp $	*/
+/*	$OpenBSD: bpf.c,v 1.189 2020/04/07 13:27:52 visa Exp $	*/
 /*	$NetBSD: bpf.c,v 1.33 1997/02/21 23:59:35 thorpej Exp $	*/
 
 /*
@@ -571,8 +571,6 @@ void
 bpf_wakeup_cb(void *xd)
 {
 	struct bpf_d *d = xd;
-
-	KERNEL_ASSERT_LOCKED();
 
 	wakeup(d);
 	if (d->bd_async && d->bd_sig)
@@ -1165,7 +1163,7 @@ bpfpoll(dev_t dev, int events, struct proc *p)
 }
 
 const struct filterops bpfread_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_bpfrdetach,
 	.f_event	= filt_bpfread,
@@ -1192,7 +1190,7 @@ bpfkqfilter(dev_t dev, struct knote *kn)
 
 	bpf_get(d);
 	kn->kn_hook = d;
-	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	klist_insert(klist, kn);
 
 	mtx_enter(&d->bd_mtx);
 	if (d->bd_rtout != -1 && d->bd_rdStart == 0)
@@ -1209,7 +1207,7 @@ filt_bpfrdetach(struct knote *kn)
 
 	KERNEL_ASSERT_LOCKED();
 
-	SLIST_REMOVE(&d->bd_sel.si_note, kn, knote, kn_selnext);
+	klist_remove(&d->bd_sel.si_note, kn);
 	bpf_put(d);
 }
 

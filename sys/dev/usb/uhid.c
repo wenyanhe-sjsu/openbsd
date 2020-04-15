@@ -1,4 +1,4 @@
-/*	$OpenBSD: uhid.c,v 1.76 2020/01/18 09:00:52 visa Exp $ */
+/*	$OpenBSD: uhid.c,v 1.79 2020/04/07 13:27:51 visa Exp $ */
 /*	$NetBSD: uhid.c,v 1.57 2003/03/11 16:44:00 augustss Exp $	*/
 
 /*
@@ -447,7 +447,7 @@ filt_uhidrdetach(struct knote *kn)
 	int s;
 
 	s = splusb();
-	SLIST_REMOVE(&sc->sc_rsel.si_note, kn, knote, kn_selnext);
+	klist_remove(&sc->sc_rsel.si_note, kn);
 	splx(s);
 }
 
@@ -461,14 +461,14 @@ filt_uhidread(struct knote *kn, long hint)
 }
 
 const struct filterops uhidread_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_uhidrdetach,
 	.f_event	= filt_uhidread,
 };
 
 const struct filterops uhid_seltrue_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_uhidrdetach,
 	.f_event	= filt_seltrue,
@@ -485,7 +485,7 @@ uhidkqfilter(dev_t dev, struct knote *kn)
 		return (ENXIO);
 
 	if (usbd_is_dying(sc->sc_hdev.sc_udev))
-		return (EIO);
+		return (ENXIO);
 
 	switch (kn->kn_filter) {
 	case EVFILT_READ:
@@ -505,7 +505,7 @@ uhidkqfilter(dev_t dev, struct knote *kn)
 	kn->kn_hook = (void *)sc;
 
 	s = splusb();
-	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	klist_insert(klist, kn);
 	splx(s);
 
 	return (0);

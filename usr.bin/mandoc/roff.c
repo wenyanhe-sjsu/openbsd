@@ -1,7 +1,7 @@
-/*	$OpenBSD: roff.c,v 1.241 2020/01/19 17:59:01 schwarze Exp $ */
+/* $OpenBSD: roff.c,v 1.246 2020/04/08 11:54:14 schwarze Exp $ */
 /*
- * Copyright (c) 2008-2012, 2014 Kristaps Dzonsons <kristaps@bsd.lv>
  * Copyright (c) 2010-2015, 2017-2020 Ingo Schwarze <schwarze@openbsd.org>
+ * Copyright (c) 2008-2012, 2014 Kristaps Dzonsons <kristaps@bsd.lv>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,6 +14,8 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * Implementation of the roff(7) parser for mandoc(1).
  */
 #include <sys/types.h>
 
@@ -194,7 +196,7 @@ static	int		 roff_ds(ROFF_ARGS);
 static	int		 roff_ec(ROFF_ARGS);
 static	int		 roff_eo(ROFF_ARGS);
 static	int		 roff_eqndelim(struct roff *, struct buf *, int);
-static	int		 roff_evalcond(struct roff *r, int, char *, int *);
+static	int		 roff_evalcond(struct roff *, int, char *, int *);
 static	int		 roff_evalnum(struct roff *, int,
 				const char *, int *, int *, int);
 static	int		 roff_evalpar(struct roff *, int,
@@ -1099,6 +1101,7 @@ roff_node_free(struct roff_node *n)
 		free(n->norm);
 	eqn_box_free(n->eqn);
 	free(n->string);
+	free(n->tag);
 	free(n);
 }
 
@@ -1112,13 +1115,72 @@ roff_node_delete(struct roff_man *man, struct roff_node *n)
 	roff_node_free(n);
 }
 
+int
+roff_node_transparent(struct roff_node *n)
+{
+	if (n == NULL)
+		return 0;
+	if (n->type == ROFFT_COMMENT || n->flags & NODE_NOPRT)
+		return 1;
+	return roff_tok_transparent(n->tok);
+}
+
+int
+roff_tok_transparent(enum roff_tok tok)
+{
+	switch (tok) {
+	case ROFF_ft:
+	case ROFF_ll:
+	case ROFF_mc:
+	case ROFF_po:
+	case ROFF_ta:
+	case MDOC_Db:
+	case MDOC_Es:
+	case MDOC_Sm:
+	case MDOC_Tg:
+	case MAN_DT:
+	case MAN_UC:
+	case MAN_PD:
+	case MAN_AT:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+struct roff_node *
+roff_node_child(struct roff_node *n)
+{
+	for (n = n->child; roff_node_transparent(n); n = n->next)
+		continue;
+	return n;
+}
+
+struct roff_node *
+roff_node_prev(struct roff_node *n)
+{
+	do {
+		n = n->prev;
+	} while (roff_node_transparent(n));
+	return n;
+}
+
+struct roff_node *
+roff_node_next(struct roff_node *n)
+{
+	do {
+		n = n->next;
+	} while (roff_node_transparent(n));
+	return n;
+}
+
 void
 deroff(char **dest, const struct roff_node *n)
 {
 	char	*cp;
 	size_t	 sz;
 
-	if (n->type != ROFFT_TEXT) {
+	if (n->string == NULL) {
 		for (n = n->child; n != NULL; n = n->next)
 			deroff(dest, n);
 		return;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.600 2020/01/24 05:14:51 jsg Exp $	*/
+/*	$OpenBSD: if.c,v 1.603 2020/04/12 07:04:03 dlg Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -938,10 +938,10 @@ if_input_process(struct ifnet *ifp, struct mbuf_list *ml)
 	 * to PF globals, pipex globals, unicast and multicast addresses
 	 * lists.
 	 */
-	NET_RLOCK();
+	NET_LOCK();
 	while ((m = ml_dequeue(ml)) != NULL)
 		if_ih_input(ifp, m);
-	NET_RUNLOCK();
+	NET_UNLOCK();
 }
 
 void
@@ -975,14 +975,14 @@ if_netisr(void *unused)
 {
 	int n, t = 0;
 
-	NET_RLOCK();
+	NET_LOCK();
 
 	while ((n = netisr) != 0) {
 		/* Like sched_pause() but with a rwlock dance. */
 		if (curcpu()->ci_schedstate.spc_schedflags & SPCF_SHOULDYIELD) {
-			NET_RUNLOCK();
+			NET_UNLOCK();
 			yield();
-			NET_RLOCK();
+			NET_LOCK();
 		}
 
 		atomic_clearbits_int(&netisr, n);
@@ -1037,7 +1037,7 @@ if_netisr(void *unused)
 	}
 #endif
 
-	NET_RUNLOCK();
+	NET_UNLOCK();
 }
 
 void
@@ -1050,10 +1050,9 @@ if_hooks_run(struct task_list *hooks)
 
 	mtx_enter(&if_hooks_mtx);
 	for (t = TAILQ_FIRST(hooks); t != NULL; t = nt) {
-		while (t->t_func == NULL) { /* skip cursors */
-			t = TAILQ_NEXT(t, t_entry);
-			if (t == NULL)
-				break;
+		if (t->t_func == NULL) { /* skip cursors */
+			nt = TAILQ_NEXT(t, t_entry);
+			continue;
 		}
 		func = t->t_func;
 		arg = t->t_arg;
@@ -3031,6 +3030,8 @@ ifpromisc(struct ifnet *ifp, int pswitch)
 	struct ifreq ifr;
 	unsigned short oif_flags;
 	int oif_pcount, error;
+
+	NET_ASSERT_LOCKED(); /* modifying if_flags and if_pcount */
 
 	oif_flags = ifp->if_flags;
 	oif_pcount = ifp->if_pcount;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.57 2019/12/16 10:40:56 claudio Exp $ */
+/*	$OpenBSD: main.c,v 1.61 2020/04/01 14:15:49 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -156,7 +156,7 @@ static void	build_chain(const struct auth *, STACK_OF(X509) **);
 static void	build_crls(const struct auth *, struct crl_tree *,
 		    STACK_OF(X509_CRL) **);
 
-const char	*bird_tablename = "roa";
+const char	*bird_tablename = "ROAS";
 
 int	 verbose;
 
@@ -884,6 +884,12 @@ proc_parser_mft(struct entity *entp, int force, X509_STORE *store,
 	X509_STORE_CTX_cleanup(ctx);
 	sk_X509_free(chain);
 	X509_free(x509);
+
+	if (!mft_check(entp->uri, mft)) {
+		mft_free(mft);
+		return NULL;
+	}
+
 	return mft;
 }
 
@@ -1025,7 +1031,7 @@ proc_parser_crl(struct entity *entp, X509_STORE *store,
 		crl->x509_crl = x509_crl;
 
 		if (RB_INSERT(crl_tree, crlt, crl) != NULL) {
-			warnx("%s: dup aki %s", __func__, crl->aki);
+			warnx("%s: duplicate AKI %s", entp->uri, crl->aki);
 			free_crl(crl);
 		}
 	}
@@ -1685,7 +1691,7 @@ main(int argc, char *argv[])
 
 usage:
 	fprintf(stderr,
-	    "usage: rpki-client [-Bcfjnov] [-b bind_addr] [-d cachedir]"
+	    "usage: rpki-client [-Bcfjnov] [-b sourceaddr] [-d cachedir]"
 	    " [-e rsync_prog]\n"
 	    "            [-T table] [-t tal] [outputdir]\n");
 	return 1;

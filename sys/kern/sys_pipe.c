@@ -1,4 +1,4 @@
-/*	$OpenBSD: sys_pipe.c,v 1.115 2020/02/01 15:52:34 anton Exp $	*/
+/*	$OpenBSD: sys_pipe.c,v 1.119 2020/04/07 13:27:51 visa Exp $	*/
 
 /*
  * Copyright (c) 1996 John S. Dyson
@@ -75,14 +75,14 @@ int	filt_piperead(struct knote *kn, long hint);
 int	filt_pipewrite(struct knote *kn, long hint);
 
 const struct filterops pipe_rfiltops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_pipedetach,
 	.f_event	= filt_piperead,
 };
 
 const struct filterops pipe_wfiltops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_pipedetach,
 	.f_event	= filt_pipewrite,
@@ -372,20 +372,17 @@ pipeselwakeup(struct pipe *cpipe)
 {
 	rw_assert_wrlock(cpipe->pipe_lock);
 
-	KERNEL_LOCK();
-
-	/* Kernel lock needed in order to prevent race with kevent. */
 	if (cpipe->pipe_state & PIPE_SEL) {
 		cpipe->pipe_state &= ~PIPE_SEL;
 		selwakeup(&cpipe->pipe_sel);
-	} else
+	} else {
+		KERNEL_LOCK();
 		KNOTE(&cpipe->pipe_sel.si_note, NOTE_SUBMIT);
+		KERNEL_UNLOCK();
+	}
 
-	/* Kernel lock needed since pgsigio() calls ptsignal(). */
 	if (cpipe->pipe_state & PIPE_ASYNC)
 		pgsigio(&cpipe->pipe_sigio, SIGIO, 0);
-
-	KERNEL_UNLOCK();
 }
 
 int
@@ -686,23 +683,25 @@ pipe_ioctl(struct file *fp, u_long cmd, caddr_t data, struct proc *p)
 	struct pipe *mpipe = fp->f_data;
 	int error = 0;
 
-	rw_enter_write(mpipe->pipe_lock);
-
 	switch (cmd) {
 
 	case FIONBIO:
 		break;
 
 	case FIOASYNC:
+		rw_enter_write(mpipe->pipe_lock);
 		if (*(int *)data) {
 			mpipe->pipe_state |= PIPE_ASYNC;
 		} else {
 			mpipe->pipe_state &= ~PIPE_ASYNC;
 		}
+		rw_exit_write(mpipe->pipe_lock);
 		break;
 
 	case FIONREAD:
+		rw_enter_read(mpipe->pipe_lock);
 		*(int *)data = mpipe->pipe_buffer.cnt;
+		rw_exit_read(mpipe->pipe_lock);
 		break;
 
 	case FIOSETOWN:
@@ -720,8 +719,6 @@ pipe_ioctl(struct file *fp, u_long cmd, caddr_t data, struct proc *p)
 	default:
 		error = ENOTTY;
 	}
-
-	rw_exit_write(mpipe->pipe_lock);
 
 	return (error);
 }
@@ -911,7 +908,7 @@ pipe_kqfilter(struct file *fp, struct knote *kn)
 	switch (kn->kn_filter) {
 	case EVFILT_READ:
 		kn->kn_fop = &pipe_rfiltops;
-		SLIST_INSERT_HEAD(&rpipe->pipe_sel.si_note, kn, kn_selnext);
+		klist_insert(&rpipe->pipe_sel.si_note, kn);
 		break;
 	case EVFILT_WRITE:
 		if (wpipe == NULL) {
@@ -920,7 +917,7 @@ pipe_kqfilter(struct file *fp, struct knote *kn)
 			break;
 		}
 		kn->kn_fop = &pipe_wfiltops;
-		SLIST_INSERT_HEAD(&wpipe->pipe_sel.si_note, kn, kn_selnext);
+		klist_insert(&wpipe->pipe_sel.si_note, kn);
 		break;
 	default:
 		error = EINVAL;
@@ -942,12 +939,12 @@ filt_pipedetach(struct knote *kn)
 
 	switch (kn->kn_filter) {
 	case EVFILT_READ:
-		SLIST_REMOVE(&rpipe->pipe_sel.si_note, kn, knote, kn_selnext);
+		klist_remove(&rpipe->pipe_sel.si_note, kn);
 		break;
 	case EVFILT_WRITE:
 		if (wpipe == NULL)
 			break;
-		SLIST_REMOVE(&wpipe->pipe_sel.si_note, kn, knote, kn_selnext);
+		klist_remove(&wpipe->pipe_sel.si_note, kn);
 		break;
 	}
 

@@ -244,6 +244,8 @@
 ./usr/share/man/man1/perl5281delta.1
 ./usr/share/man/man1/perl5282delta.1
 ./usr/share/man/man1/perl5300delta.1
+./usr/share/man/man1/perl5301delta.1
+./usr/share/man/man1/perl5302delta.1
 ./usr/share/man/man1/perl561delta.1
 ./usr/share/man/man1/perl56delta.1
 ./usr/share/man/man1/perl581delta.1
@@ -434,6 +436,7 @@
 ./usr/share/man/man1/skeyinit.1
 ./usr/share/man/man1/sleep.1
 ./usr/share/man/man1/smtp.1
+./usr/share/man/man1/sndioctl.1
 ./usr/share/man/man1/snmp.1
 ./usr/share/man/man1/sort.1
 ./usr/share/man/man1/sparc64/fdformat.1
@@ -1241,12 +1244,15 @@
 ./usr/share/man/man4/armv7/intc.4
 ./usr/share/man/man4/armv7/intro.4
 ./usr/share/man/man4/armv7/omap.4
+./usr/share/man/man4/armv7/omclock.4
+./usr/share/man/man4/armv7/omcm.4
 ./usr/share/man/man4/armv7/omdog.4
 ./usr/share/man/man4/armv7/omgpio.4
 ./usr/share/man/man4/armv7/ommmc.4
+./usr/share/man/man4/armv7/omrng.4
+./usr/share/man/man4/armv7/omsysc.4
 ./usr/share/man/man4/armv7/omwugen.4
 ./usr/share/man/man4/armv7/prcm.4
-./usr/share/man/man4/armv7/sitaracm.4
 ./usr/share/man/man4/armv7/sxie.4
 ./usr/share/man/man4/armv7/sxiintc.4
 ./usr/share/man/man4/armv7/sxitimer.4
@@ -1279,6 +1285,7 @@
 ./usr/share/man/man4/bcmdog.4
 ./usr/share/man/man4/bcmrng.4
 ./usr/share/man/man4/bcmtemp.4
+./usr/share/man/man4/bdpmic.4
 ./usr/share/man/man4/berkwdt.4
 ./usr/share/man/man4/bge.4
 ./usr/share/man/man4/bgw.4
@@ -1475,6 +1482,7 @@
 ./usr/share/man/man4/imxgpc.4
 ./usr/share/man/man4/imxgpio.4
 ./usr/share/man/man4/imxiic.4
+./usr/share/man/man4/imxpwm.4
 ./usr/share/man/man4/imxrtc.4
 ./usr/share/man/man4/imxspi.4
 ./usr/share/man/man4/imxsrc.4
@@ -1501,6 +1509,7 @@
 ./usr/share/man/man4/iwi.4
 ./usr/share/man/man4/iwm.4
 ./usr/share/man/man4/iwn.4
+./usr/share/man/man4/iwx.4
 ./usr/share/man/man4/ix.4
 ./usr/share/man/man4/ixgb.4
 ./usr/share/man/man4/ixl.4
@@ -1742,7 +1751,10 @@
 ./usr/share/man/man4/rge.4
 ./usr/share/man/man4/rgephy.4
 ./usr/share/man/man4/ricohrtc.4
+./usr/share/man/man4/rkanxdp.4
 ./usr/share/man/man4/rkclock.4
+./usr/share/man/man4/rkdrm.4
+./usr/share/man/man4/rkdwhdmi.4
 ./usr/share/man/man4/rkdwusb.4
 ./usr/share/man/man4/rkemmcphy.4
 ./usr/share/man/man4/rkgpio.4
@@ -1752,7 +1764,9 @@
 ./usr/share/man/man4/rkpinctrl.4
 ./usr/share/man/man4/rkpmic.4
 ./usr/share/man/man4/rkpwm.4
+./usr/share/man/man4/rkrng.4
 ./usr/share/man/man4/rktemp.4
+./usr/share/man/man4/rkvop.4
 ./usr/share/man/man4/rl.4
 ./usr/share/man/man4/rlphy.4
 ./usr/share/man/man4/route.4
@@ -1806,6 +1820,7 @@
 ./usr/share/man/man4/sgi/zs.4
 ./usr/share/man/man4/sili.4
 ./usr/share/man/man4/simplefb.4
+./usr/share/man/man4/simplepanel.4
 ./usr/share/man/man4/siop.4
 ./usr/share/man/man4/sis.4
 ./usr/share/man/man4/sk.4

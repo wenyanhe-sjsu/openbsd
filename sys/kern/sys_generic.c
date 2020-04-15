@@ -1,4 +1,4 @@
-/*	$OpenBSD: sys_generic.c,v 1.129 2020/02/01 08:57:27 anton Exp $	*/
+/*	$OpenBSD: sys_generic.c,v 1.131 2020/03/20 04:11:05 cheloha Exp $	*/
 /*	$NetBSD: sys_generic.c,v 1.24 1996/03/29 00:25:32 cgd Exp $	*/
 
 /*
@@ -73,6 +73,7 @@ int dopselect(struct proc *, int, fd_set *, fd_set *, fd_set *,
     struct timespec *, const sigset_t *, register_t *);
 int doppoll(struct proc *, struct pollfd *, u_int, struct timespec *,
     const sigset_t *, register_t *);
+void doselwakeup(struct selinfo *);
 
 int
 iovec_copyin(const struct iovec *uiov, struct iovec **iovp, struct iovec *aiov,
@@ -586,7 +587,8 @@ dopselect(struct proc *p, int nd, fd_set *in, fd_set *ou, fd_set *ex,
 	fd_mask bits[6];
 	fd_set *pibits[3], *pobits[3];
 	struct timespec elapsed, start, stop;
-	int s, ncoll, error = 0, timo;
+	uint64_t nsecs;
+	int s, ncoll, error = 0;
 	u_int ni;
 
 	if (nd < 0)
@@ -641,16 +643,18 @@ retry:
 	if (error || *retval)
 		goto done;
 	if (timeout == NULL || timespecisset(timeout)) {
-		timo = (timeout == NULL) ? 0 : tstohz(timeout);
-		if (timeout != NULL)
+		if (timeout != NULL) {
 			getnanouptime(&start);
+			nsecs = MIN(TIMESPEC_TO_NSEC(timeout), MAXTSLP);
+		} else
+			nsecs = INFSLP;
 		s = splhigh();
 		if ((p->p_flag & P_SELECT) == 0 || nselcoll != ncoll) {
 			splx(s);
 			goto retry;
 		}
 		atomic_clearbits_int(&p->p_flag, P_SELECT);
-		error = tsleep(&selwait, PSOCK | PCATCH, "select", timo);
+		error = tsleep_nsec(&selwait, PSOCK | PCATCH, "select", nsecs);
 		splx(s);
 		if (timeout != NULL) {
 			getnanouptime(&stop);
@@ -750,6 +754,8 @@ selrecord(struct proc *selector, struct selinfo *sip)
 	struct proc *p;
 	pid_t mytid;
 
+	KERNEL_ASSERT_LOCKED();
+
 	mytid = selector->p_tid;
 	if (sip->si_seltid == mytid)
 		return;
@@ -766,9 +772,19 @@ selrecord(struct proc *selector, struct selinfo *sip)
 void
 selwakeup(struct selinfo *sip)
 {
+	KERNEL_LOCK();
+	KNOTE(&sip->si_note, NOTE_SUBMIT);
+	doselwakeup(sip);
+	KERNEL_UNLOCK();
+}
+
+void
+doselwakeup(struct selinfo *sip)
+{
 	struct proc *p;
 
-	KNOTE(&sip->si_note, NOTE_SUBMIT);
+	KERNEL_ASSERT_LOCKED();
+
 	if (sip->si_seltid == 0)
 		return;
 	if (sip->si_flags & SI_COLL) {
@@ -903,7 +919,8 @@ doppoll(struct proc *p, struct pollfd *fds, u_int nfds,
 	size_t sz;
 	struct pollfd pfds[4], *pl = pfds;
 	struct timespec elapsed, start, stop;
-	int timo, ncoll, i, s, error;
+	uint64_t nsecs;
+	int ncoll, i, s, error;
 
 	/* Standards say no more than MAX_OPEN; this is possibly better. */
 	if (nfds > min((int)lim_cur(RLIMIT_NOFILE), maxfiles))
@@ -937,16 +954,18 @@ retry:
 	if (*retval)
 		goto done;
 	if (timeout == NULL || timespecisset(timeout)) {
-		timo = (timeout == NULL) ? 0 : tstohz(timeout);
-		if (timeout != NULL)
+		if (timeout != NULL) {
 			getnanouptime(&start);
+			nsecs = MIN(TIMESPEC_TO_NSEC(timeout), MAXTSLP);
+		} else
+			nsecs = INFSLP;
 		s = splhigh();
 		if ((p->p_flag & P_SELECT) == 0 || nselcoll != ncoll) {
 			splx(s);
 			goto retry;
 		}
 		atomic_clearbits_int(&p->p_flag, P_SELECT);
-		error = tsleep(&selwait, PSOCK | PCATCH, "poll", timo);
+		error = tsleep_nsec(&selwait, PSOCK | PCATCH, "poll", nsecs);
 		splx(s);
 		if (timeout != NULL) {
 			getnanouptime(&stop);

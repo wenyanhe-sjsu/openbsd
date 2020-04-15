@@ -1,4 +1,4 @@
-/*	$OpenBSD: vscsi.c,v 1.46 2020/01/23 07:52:59 krw Exp $ */
+/*	$OpenBSD: vscsi.c,v 1.49 2020/04/07 13:27:51 visa Exp $ */
 
 /*
  * Copyright (c) 2008 David Gwynne <dlg@openbsd.org>
@@ -96,7 +96,7 @@ int		vscsi_probe(struct scsi_link *);
 void		vscsi_free(struct scsi_link *);
 
 struct scsi_adapter vscsi_switch = {
-	vscsi_cmd, scsi_minphys, vscsi_probe, vscsi_free, NULL
+	vscsi_cmd, NULL, vscsi_probe, vscsi_free, NULL
 };
 
 int		vscsi_i2t(struct vscsi_softc *, struct vscsi_ioc_i2t *);
@@ -114,7 +114,7 @@ void		filt_vscsidetach(struct knote *);
 int		filt_vscsiread(struct knote *, long);
   
 const struct filterops vscsi_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_vscsidetach,
 	.f_event	= filt_vscsiread,
@@ -576,7 +576,7 @@ vscsikqfilter(dev_t dev, struct knote *kn)
 	kn->kn_hook = sc;
 
 	mtx_enter(&sc->sc_sel_mtx);
-	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	klist_insert(klist, kn);
 	mtx_leave(&sc->sc_sel_mtx);
 
 	/* device ref is given to the knote in the klist */
@@ -591,7 +591,7 @@ filt_vscsidetach(struct knote *kn)
 	struct klist *klist = &sc->sc_sel.si_note;
  
 	mtx_enter(&sc->sc_sel_mtx);
-	SLIST_REMOVE(klist, kn, knote, kn_selnext);
+	klist_remove(klist, kn);
 	mtx_leave(&sc->sc_sel_mtx);
 
 	device_unref(&sc->sc_dev);

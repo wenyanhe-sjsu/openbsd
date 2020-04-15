@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty_pty.c,v 1.96 2020/01/11 14:30:24 mpi Exp $	*/
+/*	$OpenBSD: tty_pty.c,v 1.98 2020/04/07 13:27:51 visa Exp $	*/
 /*	$NetBSD: tty_pty.c,v 1.33.4.1 1996/06/02 09:08:11 mrg Exp $	*/
 
 /*
@@ -655,7 +655,7 @@ filt_ptcrdetach(struct knote *kn)
 	int s;
 
 	s = spltty();
-	SLIST_REMOVE(&pti->pt_selr.si_note, kn, knote, kn_selnext);
+	klist_remove(&pti->pt_selr.si_note, kn);
 	splx(s);
 }
 
@@ -691,7 +691,7 @@ filt_ptcwdetach(struct knote *kn)
 	int s;
 
 	s = spltty();
-	SLIST_REMOVE(&pti->pt_selw.si_note, kn, knote, kn_selnext);
+	klist_remove(&pti->pt_selw.si_note, kn);
 	splx(s);
 }
 
@@ -717,14 +717,14 @@ filt_ptcwrite(struct knote *kn, long hint)
 }
 
 const struct filterops ptcread_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_ptcrdetach,
 	.f_event	= filt_ptcread,
 };
 
 const struct filterops ptcwrite_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_ptcwdetach,
 	.f_event	= filt_ptcwrite,
@@ -753,7 +753,7 @@ ptckqfilter(dev_t dev, struct knote *kn)
 	kn->kn_hook = (caddr_t)pti;
 
 	s = spltty();
-	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	klist_insert(klist, kn);
 	splx(s);
 
 	return (0);

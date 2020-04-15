@@ -1,4 +1,4 @@
-/*	$OpenBSD: cert.c,v 1.13 2019/11/29 05:11:18 benno Exp $ */
+/*	$OpenBSD: cert.c,v 1.15 2020/04/02 09:16:43 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -930,12 +930,18 @@ cert_parse_inner(X509 **xp, const char *fn, const unsigned char *dgst, int ta)
 	ASN1_OBJECT	*obj;
 	struct parse	 p;
 	BIO		*bio = NULL, *shamd;
+	FILE		*f;
 	EVP_MD		*md;
 	char		 mdbuf[EVP_MAX_MD_SIZE];
 
 	*xp = NULL;
 
-	if ((bio = BIO_new_file(fn, "rb")) == NULL) {
+	if ((f = fopen(fn, "rb")) == NULL) {
+		warn("%s", fn);
+		return NULL;
+	}
+
+	if ((bio = BIO_new_fp(f, BIO_CLOSE)) == NULL) {
 		if (verbose > 0)
 			cryptowarnx("%s: BIO_new_file", fn);
 		return NULL;
@@ -1316,7 +1322,7 @@ auth_find(struct auth_tree *auths, const char *aki)
 static inline int
 authcmp(struct auth *a, struct auth *b)
 {
-        return strcmp(a->cert->ski, b->cert->ski);
+	return strcmp(a->cert->ski, b->cert->ski);
 }
 
 RB_GENERATE(auth_tree, auth, entry, authcmp);

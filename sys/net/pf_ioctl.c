@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf_ioctl.c,v 1.348 2020/01/08 21:48:59 bluhm Exp $ */
+/*	$OpenBSD: pf_ioctl.c,v 1.350 2020/04/12 11:56:52 mpi Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -51,7 +51,7 @@
 #include <sys/timeout.h>
 #include <sys/pool.h>
 #include <sys/malloc.h>
-#include <sys/kthread.h>
+#include <sys/proc.h>
 #include <sys/rwlock.h>
 #include <sys/syslog.h>
 #include <uvm/uvm_extern.h>
@@ -2921,12 +2921,12 @@ pf_sysctl(void *oldp, size_t *oldlenp, void *newp, size_t newlen)
 {
 	struct pf_status	pfs;
 
-	NET_RLOCK();
+	NET_LOCK();
 	PF_LOCK();
 	memcpy(&pfs, &pf_status, sizeof(struct pf_status));
 	pfi_update_status(pfs.ifname, &pfs);
 	PF_UNLOCK();
-	NET_RUNLOCK();
+	NET_UNLOCK();
 
 	return sysctl_rdstruct(oldp, oldlenp, newp, &pfs, sizeof(pfs));
 }

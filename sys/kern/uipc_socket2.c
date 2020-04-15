@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket2.c,v 1.102 2020/01/15 13:17:35 mpi Exp $	*/
+/*	$OpenBSD: uipc_socket2.c,v 1.104 2020/04/11 14:07:06 claudio Exp $	*/
 /*	$NetBSD: uipc_socket2.c,v 1.11 1996/02/04 02:17:55 christos Exp $	*/
 
 /*
@@ -408,11 +408,9 @@ sowakeup(struct socket *so, struct sockbuf *sb)
 		sb->sb_flags &= ~SB_WAIT;
 		wakeup(&sb->sb_cc);
 	}
-	KERNEL_LOCK();
 	if (so->so_state & SS_ASYNC)
 		pgsigio(&so->so_sigio, SIGIO, 0);
 	selwakeup(&sb->sb_sel);
-	KERNEL_UNLOCK();
 }
 
 /*
@@ -621,6 +619,7 @@ sbappend(struct socket *so, struct sockbuf *sb, struct mbuf *m)
 	if (m == NULL)
 		return;
 
+	soassertlocked(so);
 	SBLASTRECORDCHK(sb, "sbappend 1");
 
 	if ((n = sb->sb_lastrecord) != NULL) {
@@ -785,6 +784,8 @@ sbappendaddr(struct socket *so, struct sockbuf *sb, const struct sockaddr *asa,
 {
 	struct mbuf *m, *n, *nlast;
 	int space = asa->sa_len;
+
+	soassertlocked(so);
 
 	if (m0 && (m0->m_flags & M_PKTHDR) == 0)
 		panic("sbappendaddr");

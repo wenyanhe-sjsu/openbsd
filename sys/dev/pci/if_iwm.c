@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwm.c,v 1.293 2019/12/20 10:23:27 stsp Exp $	*/
+/*	$OpenBSD: if_iwm.c,v 1.307 2020/04/09 21:36:50 stsp Exp $	*/
 
 /*
  * Copyright (c) 2014, 2016 genua gmbh <info@genua.de>
@@ -373,9 +373,8 @@ void	iwm_rx_rx_phy_cmd(struct iwm_softc *, struct iwm_rx_packet *,
 int	iwm_get_noise(const struct iwm_statistics_rx_non_phy *);
 void	iwm_rx_frame(struct iwm_softc *, struct mbuf *, int, int, int, uint32_t,
 	    struct ieee80211_rxinfo *, struct mbuf_list *);
-void	iwm_enable_ht_cck_fallback(struct iwm_softc *, struct iwm_node *);
 void	iwm_rx_tx_cmd_single(struct iwm_softc *, struct iwm_rx_packet *,
-	    struct iwm_node *);
+	    struct iwm_node *, int, int);
 void	iwm_rx_tx_cmd(struct iwm_softc *, struct iwm_rx_packet *,
 	    struct iwm_rx_data *);
 void	iwm_rx_bmiss(struct iwm_softc *, struct iwm_rx_packet *,
@@ -453,8 +452,7 @@ int	iwm_run(struct iwm_softc *);
 int	iwm_run_stop(struct iwm_softc *);
 struct ieee80211_node *iwm_node_alloc(struct ieee80211com *);
 void	iwm_calib_timeout(void *);
-void	iwm_setrates_task(void *);
-void	iwm_setrates(struct iwm_node *);
+void	iwm_setrates(struct iwm_node *, int);
 int	iwm_media_change(struct ifnet *);
 void	iwm_newstate_task(void *);
 int	iwm_newstate(struct ieee80211com *, enum ieee80211_state, int);
@@ -1276,6 +1274,7 @@ iwm_alloc_tx_ring(struct iwm_softc *sc, struct iwm_tx_ring *ring, int qid)
 	ring->qid = qid;
 	ring->queued = 0;
 	ring->cur = 0;
+	ring->tail = 0;
 
 	/* Allocate TX descriptors (256-byte aligned). */
 	size = IWM_TX_RING_COUNT * sizeof (struct iwm_tfd);
@@ -1377,6 +1376,7 @@ iwm_reset_tx_ring(struct iwm_softc *sc, struct iwm_tx_ring *ring)
 	}
 	ring->queued = 0;
 	ring->cur = 0;
+	ring->tail = 0;
 }
 
 void
@@ -3928,7 +3928,7 @@ iwm_rx_frame(struct iwm_softc *sc, struct mbuf *m, int chanidx,
 		tap->wr_dbm_antsignal = (int8_t)rxi->rxi_rssi;
 		tap->wr_dbm_antnoise = (int8_t)sc->sc_noise;
 		tap->wr_tsft = device_timestamp;
-		if (rate_n_flags & IWM_RATE_HT_MCS_RATE_CODE_MSK) {
+		if (rate_n_flags & IWM_RATE_MCS_HT_MSK) {
 			uint8_t mcs = (rate_n_flags &
 			    (IWM_RATE_HT_MCS_RATE_CODE_MSK |
 			    IWM_RATE_HT_MCS_NSS_MSK));
@@ -3987,23 +3987,37 @@ iwm_rx_mpdu(struct iwm_softc *sc, struct mbuf *m, void *pktdata,
 	phy_info = &sc->sc_last_phy_info;
 	rx_res = (struct iwm_rx_mpdu_res_start *)pktdata;
 	len = le16toh(rx_res->byte_count);
-	if (len < IEEE80211_MIN_LEN) {
+	if (ic->ic_opmode == IEEE80211_M_MONITOR) {
+		/* Allow control frames in monitor mode. */
+		if (len < sizeof(struct ieee80211_frame_cts)) {
+			ic->ic_stats.is_rx_tooshort++;
+			IC2IFP(ic)->if_ierrors++;
+			m_freem(m);
+			return;
+		}
+	} else if (len < sizeof(struct ieee80211_frame)) {
 		ic->ic_stats.is_rx_tooshort++;
 		IC2IFP(ic)->if_ierrors++;
+		m_freem(m);
 		return;
 	}
 	if (len > maxlen - sizeof(*rx_res)) {
 		IC2IFP(ic)->if_ierrors++;
+		m_freem(m);
 		return;
 	}
 
-	if (__predict_false(phy_info->cfg_phy_cnt > 20))
+	if (__predict_false(phy_info->cfg_phy_cnt > 20)) {
+		m_freem(m);
 		return;
+	}
 
 	rx_pkt_status = le32toh(*(uint32_t *)(pktdata + sizeof(*rx_res) + len));
 	if (!(rx_pkt_status & IWM_RX_MPDU_RES_STATUS_CRC_OK) ||
-	    !(rx_pkt_status & IWM_RX_MPDU_RES_STATUS_OVERRUN_OK))
+	    !(rx_pkt_status & IWM_RX_MPDU_RES_STATUS_OVERRUN_OK)) {
+		m_freem(m);
 		return; /* drop */
+	}
 
 	m->m_data = pktdata + sizeof(*rx_res);
 	m->m_pkthdr.len = m->m_len = len;
@@ -4041,17 +4055,29 @@ iwm_rx_mpdu_mq(struct iwm_softc *sc, struct mbuf *m, void *pktdata,
 	desc = (struct iwm_rx_mpdu_desc *)pktdata;
 
 	if (!(desc->status & htole16(IWM_RX_MPDU_RES_STATUS_CRC_OK)) ||
-	    !(desc->status & htole16(IWM_RX_MPDU_RES_STATUS_OVERRUN_OK)))
+	    !(desc->status & htole16(IWM_RX_MPDU_RES_STATUS_OVERRUN_OK))) {
+		m_freem(m);
 		return; /* drop */
+	}
 
 	len = le16toh(desc->mpdu_len);
-	if (len < IEEE80211_MIN_LEN) {
+	if (ic->ic_opmode == IEEE80211_M_MONITOR) {
+		/* Allow control frames in monitor mode. */
+		if (len < sizeof(struct ieee80211_frame_cts)) {
+			ic->ic_stats.is_rx_tooshort++;
+			IC2IFP(ic)->if_ierrors++;
+			m_freem(m);
+			return;
+		}
+	} else if (len < sizeof(struct ieee80211_frame)) {
 		ic->ic_stats.is_rx_tooshort++;
 		IC2IFP(ic)->if_ierrors++;
+		m_freem(m);
 		return;
 	}
 	if (len > maxlen - sizeof(*desc)) {
 		IC2IFP(ic)->if_ierrors++;
+		m_freem(m);
 		return;
 	}
 
@@ -4099,39 +4125,8 @@ iwm_rx_mpdu_mq(struct iwm_softc *sc, struct mbuf *m, void *pktdata,
 }
 
 void
-iwm_enable_ht_cck_fallback(struct iwm_softc *sc, struct iwm_node *in)
-{
-	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_node *ni = &in->in_ni;
-	struct ieee80211_rateset *rs = &ni->ni_rates;
-	uint8_t rval = (rs->rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL);
-	uint8_t min_rval = ieee80211_min_basic_rate(ic);
-	int i;
-
-	/* Are CCK frames forbidden in our BSS? */
-	if (IWM_RVAL_IS_OFDM(min_rval))
-		return;
-
-	in->ht_force_cck = 1;
-
-	ieee80211_mira_cancel_timeouts(&in->in_mn);
-	ieee80211_mira_node_init(&in->in_mn);
-	ieee80211_amrr_node_init(&sc->sc_amrr, &in->in_amn);
-
-	/* Choose initial CCK Tx rate. */
-	ni->ni_txrate = 0;
-	for (i = 0; i < rs->rs_nrates; i++) {
-		rval = (rs->rs_rates[i] & IEEE80211_RATE_VAL);
-		if (rval == min_rval) {
-			ni->ni_txrate = i;
-			break;
-		}
-	}
-}
-
-void
 iwm_rx_tx_cmd_single(struct iwm_softc *sc, struct iwm_rx_packet *pkt,
-    struct iwm_node *in)
+    struct iwm_node *in, int txmcs, int txrate)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni = &in->in_ni;
@@ -4145,19 +4140,23 @@ iwm_rx_tx_cmd_single(struct iwm_softc *sc, struct iwm_rx_packet *pkt,
 	txfail = (status != IWM_TX_STATUS_SUCCESS &&
 	    status != IWM_TX_STATUS_DIRECT_DONE);
 
-	/* Update rate control statistics. */
-	if ((ni->ni_flags & IEEE80211_NODE_HT) == 0 || in->ht_force_cck) {
-		in->in_amn.amn_txcnt++;
-		if (in->ht_force_cck) {
-			/*
-			 * We want to move back to OFDM quickly if possible.
-			 * Only show actual Tx failures to AMRR, not retries.
-			 */
+	/*
+	 * Update rate control statistics.
+	 * Only report frames which were actually queued with the currently
+	 * selected Tx rate. Because Tx queues are relatively long we may
+	 * encounter previously selected rates here during Tx bursts.
+	 * Providing feedback based on such frames can lead to suboptimal
+	 * Tx rate control decisions.
+	 */
+	if ((ni->ni_flags & IEEE80211_NODE_HT) == 0) {
+		if (txrate == ni->ni_txrate) {
+			in->in_amn.amn_txcnt++;
 			if (txfail)
 				in->in_amn.amn_retrycnt++;
-		} else if (tx_resp->failure_frame > 0)
-			in->in_amn.amn_retrycnt++;
-	} else if (ic->ic_fixed_mcs == -1) {
+			if (tx_resp->failure_frame > 0)
+				in->in_amn.amn_retrycnt++;
+		}
+	} else if (ic->ic_fixed_mcs == -1 && txmcs == ni->ni_txmcs) {
 		in->in_mn.frames += tx_resp->frame_count;
 		in->in_mn.ampdu_size = le16toh(tx_resp->byte_cnt);
 		in->in_mn.agglen = tx_resp->frame_count;
@@ -4165,7 +4164,7 @@ iwm_rx_tx_cmd_single(struct iwm_softc *sc, struct iwm_rx_packet *pkt,
 			in->in_mn.retries += tx_resp->failure_frame;
 		if (txfail)
 			in->in_mn.txfail += tx_resp->frame_count;
-		if (ic->ic_state == IEEE80211_S_RUN && !in->ht_force_cck) {
+		if (ic->ic_state == IEEE80211_S_RUN) {
 			int best_mcs;
 
 			ieee80211_mira_choose(&in->in_mn, ic, &in->in_ni);
@@ -4178,18 +4177,29 @@ iwm_rx_tx_cmd_single(struct iwm_softc *sc, struct iwm_rx_packet *pkt,
 			best_mcs = ieee80211_mira_get_best_mcs(&in->in_mn);
 			if (best_mcs != in->chosen_txmcs) {
 				in->chosen_txmcs = best_mcs;
-				iwm_add_task(sc, systq, &sc->setrates_task);
+				iwm_setrates(in, 1);
 			}
-
-			/* Fall back to CCK rates if MCS 0 is failing. */
-			if (txfail && IEEE80211_IS_CHAN_2GHZ(ni->ni_chan) &&
-			    in->chosen_txmcs == 0 && best_mcs == 0)
-				iwm_enable_ht_cck_fallback(sc, in);
 		}
 	}
 
 	if (txfail)
 		ifp->if_oerrors++;
+}
+
+void
+iwm_txd_done(struct iwm_softc *sc, struct iwm_tx_data *txd)
+{
+	struct ieee80211com *ic = &sc->sc_ic;
+
+	bus_dmamap_sync(sc->sc_dmat, txd->map, 0, txd->map->dm_mapsize,
+	    BUS_DMASYNC_POSTWRITE);
+	bus_dmamap_unload(sc->sc_dmat, txd->map);
+	m_freem(txd->m);
+	txd->m = NULL;
+
+	KASSERT(txd->in);
+	ieee80211_release_node(ic, &txd->in->in_ni);
+	txd->in = NULL;
 }
 
 void
@@ -4202,31 +4212,35 @@ iwm_rx_tx_cmd(struct iwm_softc *sc, struct iwm_rx_packet *pkt,
 	int idx = cmd_hdr->idx;
 	int qid = cmd_hdr->qid;
 	struct iwm_tx_ring *ring = &sc->txq[qid];
-	struct iwm_tx_data *txd = &ring->data[idx];
-	struct iwm_node *in = txd->in;
-
-	if (txd->done)
-		return;
+	struct iwm_tx_data *txd;
 
 	bus_dmamap_sync(sc->sc_dmat, data->map, 0, IWM_RBUF_SIZE,
 	    BUS_DMASYNC_POSTREAD);
 
 	sc->sc_tx_timer = 0;
 
-	iwm_rx_tx_cmd_single(sc, pkt, in);
+	txd = &ring->data[idx];
+	if (txd->m == NULL)
+		return;
 
-	bus_dmamap_sync(sc->sc_dmat, txd->map, 0, txd->map->dm_mapsize,
-	    BUS_DMASYNC_POSTWRITE);
-	bus_dmamap_unload(sc->sc_dmat, txd->map);
-	m_freem(txd->m);
+	iwm_rx_tx_cmd_single(sc, pkt, txd->in, txd->txmcs, txd->txrate);
+	iwm_txd_done(sc, txd);
 
-	KASSERT(txd->done == 0);
-	txd->done = 1;
-	KASSERT(txd->in);
-
-	txd->m = NULL;
-	txd->in = NULL;
-	ieee80211_release_node(ic, &in->in_ni);
+	/*
+	 * XXX Sometimes we miss Tx completion interrupts.
+	 * We cannot check Tx success/failure for affected frames; just free
+	 * the associated mbuf and release the associated node reference.
+	 */
+	while (ring->tail != idx) {
+		txd = &ring->data[ring->tail];
+		if (txd->m != NULL) {
+			DPRINTF(("%s: missed Tx completion: tail=%d idx=%d\n",
+			    __func__, ring->tail, idx));
+			iwm_txd_done(sc, txd);
+			ring->queued--;
+		}
+		ring->tail = (ring->tail + 1) % IWM_TX_RING_COUNT;
+	}
 
 	if (--ring->queued < IWM_TX_RING_LOMARK) {
 		sc->qfullmsk &= ~(1 << ring->qid);
@@ -4691,7 +4705,6 @@ iwm_tx_fill_cmd(struct iwm_softc *sc, struct iwm_node *in,
 {
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni = &in->in_ni;
-	struct ieee80211_rateset *rs = &ni->ni_rates;
 	const struct iwm_rate *rinfo;
 	int type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
 	int min_ridx = iwm_rval2ridx(ieee80211_min_basic_rate(ic));
@@ -4709,16 +4722,10 @@ iwm_tx_fill_cmd(struct iwm_softc *sc, struct iwm_node *in,
 		ridx = sc->sc_fixed_ridx;
 	} else if (ic->ic_fixed_rate != -1) {
 		ridx = sc->sc_fixed_ridx;
-	} else if ((ni->ni_flags & IEEE80211_NODE_HT) && !in->ht_force_cck &&
+	} else if ((ni->ni_flags & IEEE80211_NODE_HT) &&
 	    ieee80211_mira_is_probing(&in->in_mn)) {
 		/* Keep Tx rate constant while mira is probing. */
 		ridx = iwm_mcs2ridx[ni->ni_txmcs];
-	} else if ((ni->ni_flags & IEEE80211_NODE_HT) && in->ht_force_cck) {
-		uint8_t rval;
-		rval = (rs->rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL);
-		ridx = iwm_rval2ridx(rval);
-		if (ridx < min_ridx)
-			ridx = min_ridx;
  	} else {
 		int i;
 		/* Use firmware rateset retry table. */
@@ -4750,6 +4757,8 @@ iwm_tx_fill_cmd(struct iwm_softc *sc, struct iwm_node *in,
 	if ((ni->ni_flags & IEEE80211_NODE_HT) &&
 	    rinfo->ht_plcp != IWM_RATE_HT_SISO_MCS_INV_PLCP) {
 		rate_flags |= IWM_RATE_MCS_HT_MSK; 
+		if (ieee80211_node_supports_ht_sgi20(ni))
+			rate_flags |= IWM_RATE_MCS_SGI_MSK;
 		tx->rate_n_flags = htole32(rate_flags | rinfo->ht_plcp);
 	} else
 		tx->rate_n_flags = htole32(rate_flags | rinfo->plcp);
@@ -4937,7 +4946,8 @@ iwm_tx(struct iwm_softc *sc, struct mbuf *m, struct ieee80211_node *ni, int ac)
 	}
 	data->m = m;
 	data->in = in;
-	data->done = 0;
+	data->txmcs = ni->ni_txmcs;
+	data->txrate = ni->ni_txrate;
 
 	/* Fill TX descriptor. */
 	desc->num_tbs = 2 + data->map->dm_nsegs;
@@ -5192,12 +5202,27 @@ iwm_add_sta_cmd(struct iwm_softc *sc, struct iwm_node *in, int update)
 
 	memset(&add_sta_cmd, 0, sizeof(add_sta_cmd));
 
-	add_sta_cmd.sta_id = IWM_STATION_ID;
-	if (isset(sc->sc_ucode_api, IWM_UCODE_TLV_API_STA_TYPE))
-		add_sta_cmd.station_type = IWM_STA_LINK;
+	if (ic->ic_opmode == IEEE80211_M_MONITOR)
+		add_sta_cmd.sta_id = IWM_MONITOR_STA_ID;
+	else
+		add_sta_cmd.sta_id = IWM_STATION_ID;
+	if (isset(sc->sc_ucode_api, IWM_UCODE_TLV_API_STA_TYPE)) {
+		if (ic->ic_opmode == IEEE80211_M_MONITOR)
+			add_sta_cmd.station_type = IWM_STA_GENERAL_PURPOSE;
+		else
+			add_sta_cmd.station_type = IWM_STA_LINK;
+	}
 	add_sta_cmd.mac_id_n_color
 	    = htole32(IWM_FW_CMD_ID_AND_COLOR(in->in_id, in->in_color));
-	if (!update) {
+	if (ic->ic_opmode == IEEE80211_M_MONITOR) {
+		int qid;
+		IEEE80211_ADDR_COPY(&add_sta_cmd.addr, etheranyaddr);
+		if (isset(sc->sc_enabled_capa, IWM_UCODE_TLV_CAPA_DQA_SUPPORT))
+			qid = IWM_DQA_INJECT_MONITOR_QUEUE;
+		else
+			qid = IWM_AUX_QUEUE;
+		add_sta_cmd.tfd_queue_msk |= htole32(1 << qid);
+	} else if (!update) {
 		int ac;
 		for (ac = 0; ac < EDCA_NUM_AC; ac++) {
 			int qid = ac;
@@ -5206,12 +5231,7 @@ iwm_add_sta_cmd(struct iwm_softc *sc, struct iwm_node *in, int update)
 				qid += IWM_DQA_MIN_MGMT_QUEUE;
 			add_sta_cmd.tfd_queue_msk |= htole32(1 << qid);
 		}
-		if (ic->ic_opmode == IEEE80211_M_MONITOR)
-			IEEE80211_ADDR_COPY(&add_sta_cmd.addr,
-			    etherbroadcastaddr);
-		else
-			IEEE80211_ADDR_COPY(&add_sta_cmd.addr,
-			    in->in_ni.ni_bssid);
+		IEEE80211_ADDR_COPY(&add_sta_cmd.addr, in->in_ni.ni_bssid);
 	}
 	add_sta_cmd.add_modify = update ? 1 : 0;
 	add_sta_cmd.station_flags_msk
@@ -5224,6 +5244,17 @@ iwm_add_sta_cmd(struct iwm_softc *sc, struct iwm_node *in, int update)
 		add_sta_cmd.station_flags_msk
 		    |= htole32(IWM_STA_FLG_MAX_AGG_SIZE_MSK |
 		    IWM_STA_FLG_AGG_MPDU_DENS_MSK);
+
+		if (!sc->sc_nvm.sku_cap_mimo_disable) {
+			if (in->in_ni.ni_rxmcs[1] != 0) {
+				add_sta_cmd.station_flags |=
+				    htole32(IWM_STA_FLG_MIMO_EN_MIMO2);
+			}
+			if (in->in_ni.ni_rxmcs[2] != 0) {
+				add_sta_cmd.station_flags |=
+				    htole32(IWM_STA_FLG_MIMO_EN_MIMO3);
+			}
+		}
 
 		add_sta_cmd.station_flags
 		    |= htole32(IWM_STA_FLG_MAX_AGG_SIZE_64K);
@@ -5306,6 +5337,7 @@ iwm_add_aux_sta(struct iwm_softc *sc)
 int
 iwm_rm_sta_cmd(struct iwm_softc *sc, struct iwm_node *in)
 {
+	struct ieee80211com *ic = &sc->sc_ic;
 	struct iwm_rm_sta_cmd rm_sta_cmd;
 	int err;
 
@@ -5313,7 +5345,10 @@ iwm_rm_sta_cmd(struct iwm_softc *sc, struct iwm_node *in)
 		panic("sta already removed");
 
 	memset(&rm_sta_cmd, 0, sizeof(rm_sta_cmd));
-	rm_sta_cmd.sta_id = IWM_STATION_ID;
+	if (ic->ic_opmode == IEEE80211_M_MONITOR)
+		rm_sta_cmd.sta_id = IWM_MONITOR_STA_ID;
+	else
+		rm_sta_cmd.sta_id = IWM_STATION_ID;
 
 	err = iwm_send_cmd_pdu(sc, IWM_REMOVE_STA, 0, sizeof(rm_sta_cmd),
 	    &rm_sta_cmd);
@@ -6177,6 +6212,7 @@ iwm_mac_ctxt_cmd(struct iwm_softc *sc, struct iwm_node *in, uint32_t action,
 	if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 		cmd.filter_flags |= htole32(IWM_MAC_FILTER_IN_PROMISC |
 		    IWM_MAC_FILTER_IN_CONTROL_AND_MGMT |
+		    IWM_MAC_FILTER_ACCEPT_GRP |
 		    IWM_MAC_FILTER_IN_BEACON |
 		    IWM_MAC_FILTER_IN_PROBE_REQUEST |
 		    IWM_MAC_FILTER_IN_CRC32);
@@ -6603,6 +6639,14 @@ iwm_run(struct iwm_softc *sc)
 		}
 	}
 
+	/* Update STA again, for HT-related settings such as MIMO. */
+	err = iwm_add_sta_cmd(sc, in, 1);
+	if (err) {
+		printf("%s: could not update STA (error %d)\n",
+		    DEVNAME(sc), err);
+		return err;
+	}
+
 	/* We have now been assigned an associd by the AP. */
 	err = iwm_mac_ctxt_cmd(sc, in, IWM_FW_CTXT_ACTION_MODIFY, 1);
 	if (err) {
@@ -6670,7 +6714,7 @@ iwm_run(struct iwm_softc *sc)
 	in->in_ni.ni_txmcs = 0;
 	in->chosen_txrate = 0;
 	in->chosen_txmcs = 0;
-	iwm_setrates(in);
+	iwm_setrates(in, 0);
 
 	timeout_add_msec(&sc->sc_calib_to, 500);
 	iwm_led_enable(sc);
@@ -6740,7 +6784,7 @@ iwm_calib_timeout(void *arg)
 
 	s = splnet();
 	if ((ic->ic_fixed_rate == -1 || ic->ic_fixed_mcs == -1) &&
-	    ((ni->ni_flags & IEEE80211_NODE_HT) == 0 || in->ht_force_cck) &&
+	    (ni->ni_flags & IEEE80211_NODE_HT) == 0 &&
 	    ic->ic_opmode == IEEE80211_M_STA && ic->ic_bss) {
 		ieee80211_amrr_choose(&sc->sc_amrr, &in->in_ni, &in->in_amn);
 		/* 
@@ -6751,14 +6795,7 @@ iwm_calib_timeout(void *arg)
 		 */
 		if (ni->ni_txrate != in->chosen_txrate) {
 			in->chosen_txrate = ni->ni_txrate;
-			iwm_add_task(sc, systq, &sc->setrates_task);
-		}
-		if (in->ht_force_cck) {
-			struct ieee80211_rateset *rs = &ni->ni_rates;
-			uint8_t rv;
-			rv = (rs->rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL);
-			if (IWM_RVAL_IS_OFDM(rv))
-				in->ht_force_cck = 0;
+			iwm_setrates(in, 1);
 		}
 	}
 
@@ -6768,27 +6805,7 @@ iwm_calib_timeout(void *arg)
 }
 
 void
-iwm_setrates_task(void *arg)
-{
-	struct iwm_softc *sc = arg;
-	struct ieee80211com *ic = &sc->sc_ic;
-	struct iwm_node *in = (struct iwm_node *)ic->ic_bss;
-	int s = splnet();
-
-	if (sc->sc_flags & IWM_FLAG_SHUTDOWN) {
-		refcnt_rele_wake(&sc->task_refs);
-		splx(s);
-		return;
-	}
-
-	/* Update rates table based on new TX rate determined by AMRR. */
-	iwm_setrates(in);
-	refcnt_rele_wake(&sc->task_refs);
-	splx(s);
-}
-
-void
-iwm_setrates(struct iwm_node *in)
+iwm_setrates(struct iwm_node *in, int async)
 {
 	struct ieee80211_node *ni = &in->in_ni;
 	struct ieee80211com *ic = ni->ni_ic;
@@ -6800,6 +6817,8 @@ iwm_setrates(struct iwm_node *in)
 		.id = IWM_LQ_CMD,
 		.len = { sizeof(lqcmd), },
 	};
+
+	cmd.flags = async ? IWM_CMD_ASYNC : 0;
 
 	memset(&lqcmd, 0, sizeof(lqcmd));
 	lqcmd.sta_id = IWM_STATION_ID;
@@ -7045,7 +7064,6 @@ iwm_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 		ieee80211_mira_cancel_timeouts(&in->in_mn);
 		iwm_del_task(sc, systq, &sc->ba_task);
 		iwm_del_task(sc, systq, &sc->htprot_task);
-		iwm_del_task(sc, systq, &sc->setrates_task);
 	}
 
 	sc->ns_nstate = nstate;
@@ -7493,7 +7511,7 @@ int
 iwm_init_hw(struct iwm_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
-	int err, i, ac;
+	int err, i, ac, qid;
 
 	err = iwm_preinit(sc);
 	if (err)
@@ -7621,18 +7639,32 @@ iwm_init_hw(struct iwm_softc *sc)
 		}
 	}
 
-	for (ac = 0; ac < EDCA_NUM_AC; ac++) {
-		int qid;
+	if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 		if (isset(sc->sc_enabled_capa, IWM_UCODE_TLV_CAPA_DQA_SUPPORT))
-			qid = ac + IWM_DQA_MIN_MGMT_QUEUE;
+			qid = IWM_DQA_INJECT_MONITOR_QUEUE;
 		else
-			qid = ac;
-		err = iwm_enable_txq(sc, IWM_STATION_ID, qid,
-		    iwm_ac_to_tx_fifo[ac]);
+			qid = IWM_AUX_QUEUE;
+		err = iwm_enable_txq(sc, IWM_MONITOR_STA_ID, qid,
+		    iwm_ac_to_tx_fifo[EDCA_AC_BE]);
 		if (err) {
-			printf("%s: could not enable Tx queue %d (error %d)\n",
-			    DEVNAME(sc), ac, err);
+			printf("%s: could not enable monitor inject Tx queue "
+			    "(error %d)\n", DEVNAME(sc), err);
 			goto err;
+		}
+	} else {
+		for (ac = 0; ac < EDCA_NUM_AC; ac++) {
+			if (isset(sc->sc_enabled_capa,
+			    IWM_UCODE_TLV_CAPA_DQA_SUPPORT))
+				qid = ac + IWM_DQA_MIN_MGMT_QUEUE;
+			else
+				qid = ac;
+			err = iwm_enable_txq(sc, IWM_STATION_ID, qid,
+			    iwm_ac_to_tx_fifo[ac]);
+			if (err) {
+				printf("%s: could not enable Tx queue %d "
+				    "(error %d)\n", DEVNAME(sc), ac, err);
+				goto err;
+			}
 		}
 	}
 
@@ -7805,7 +7837,6 @@ iwm_stop(struct ifnet *ifp)
 	/* Cancel scheduled tasks and let any stale tasks finish up. */
 	task_del(systq, &sc->init_task);
 	iwm_del_task(sc, sc->sc_nswq, &sc->newstate_task);
-	iwm_del_task(sc, systq, &sc->setrates_task);
 	iwm_del_task(sc, systq, &sc->ba_task);
 	iwm_del_task(sc, systq, &sc->htprot_task);
 	KASSERT(sc->task_refs.refs >= 1);
@@ -8273,6 +8304,8 @@ iwm_rx_pkt(struct iwm_softc *sc, struct iwm_rx_data *data, struct mbuf_list *ml)
 				m = m_copym(m0, 0, M_COPYALL, M_DONTWAIT);
 				if (m == NULL) {
 					ifp->if_ierrors++;
+					m_freem(m0);
+					m0 = NULL;
 					break;
 				}
 				m_adj(m, offset);
@@ -8589,8 +8622,8 @@ iwm_intr(void *arg)
 {
 	struct iwm_softc *sc = arg;
 	int handled = 0;
-	int r1, r2, rv = 0;
-	int isperiodic = 0;
+	int rv = 0;
+	uint32_t r1, r2;
 
 	IWM_WRITE(sc, IWM_CSR_INT_MASK, 0);
 
@@ -8617,19 +8650,24 @@ iwm_intr(void *arg)
 		if (r1 == 0xffffffff)
 			r1 = 0;
 
-		/* i am not expected to understand this */
+		/*
+		 * Workaround for hardware bug where bits are falsely cleared
+		 * when using interrupt coalescing.  Bit 15 should be set if
+		 * bits 18 and 19 are set.
+		 */
 		if (r1 & 0xc0000)
 			r1 |= 0x8000;
+
 		r1 = (0xff & r1) | ((0xff00 & r1) << 16);
 	} else {
 		r1 = IWM_READ(sc, IWM_CSR_INT);
-		if (r1 == 0xffffffff || (r1 & 0xfffffff0) == 0xa5a5a5a0)
-			goto out;
 		r2 = IWM_READ(sc, IWM_CSR_FH_INT_STATUS);
 	}
 	if (r1 == 0 && r2 == 0) {
 		goto out_ena;
 	}
+	if (r1 == 0xffffffff || (r1 & 0xfffffff0) == 0xa5a5a5a0)
+		goto out;
 
 	IWM_WRITE(sc, IWM_CSR_INT, r1 | ~sc->sc_intmask);
 
@@ -8691,27 +8729,32 @@ iwm_intr(void *arg)
 		wakeup(&sc->sc_fw);
 	}
 
-	if (r1 & IWM_CSR_INT_BIT_RX_PERIODIC) {
-		handled |= IWM_CSR_INT_BIT_RX_PERIODIC;
-		IWM_WRITE(sc, IWM_CSR_INT, IWM_CSR_INT_BIT_RX_PERIODIC);
-		if ((r1 & (IWM_CSR_INT_BIT_FH_RX | IWM_CSR_INT_BIT_SW_RX)) == 0)
-			IWM_WRITE_1(sc,
-			    IWM_CSR_INT_PERIODIC_REG, IWM_CSR_INT_PERIODIC_DIS);
-		isperiodic = 1;
-	}
+	if (r1 & (IWM_CSR_INT_BIT_FH_RX | IWM_CSR_INT_BIT_SW_RX |
+	    IWM_CSR_INT_BIT_RX_PERIODIC)) {
+		if (r1 & (IWM_CSR_INT_BIT_FH_RX | IWM_CSR_INT_BIT_SW_RX)) {
+			handled |= (IWM_CSR_INT_BIT_FH_RX | IWM_CSR_INT_BIT_SW_RX);
+			IWM_WRITE(sc, IWM_CSR_FH_INT_STATUS, IWM_CSR_FH_INT_RX_MASK);
+		}
+		if (r1 & IWM_CSR_INT_BIT_RX_PERIODIC) {
+			handled |= IWM_CSR_INT_BIT_RX_PERIODIC;
+			IWM_WRITE(sc, IWM_CSR_INT, IWM_CSR_INT_BIT_RX_PERIODIC);
+		}
 
-	if ((r1 & (IWM_CSR_INT_BIT_FH_RX | IWM_CSR_INT_BIT_SW_RX)) ||
-	    isperiodic) {
-		handled |= (IWM_CSR_INT_BIT_FH_RX | IWM_CSR_INT_BIT_SW_RX);
-		IWM_WRITE(sc, IWM_CSR_FH_INT_STATUS, IWM_CSR_FH_INT_RX_MASK);
+		/* Disable periodic interrupt; we use it as just a one-shot. */
+		IWM_WRITE_1(sc, IWM_CSR_INT_PERIODIC_REG, IWM_CSR_INT_PERIODIC_DIS);
 
-		iwm_notif_intr(sc);
-
-		/* enable periodic interrupt, see above */
-		if (r1 & (IWM_CSR_INT_BIT_FH_RX | IWM_CSR_INT_BIT_SW_RX) &&
-		    !isperiodic)
+		/*
+		 * Enable periodic interrupt in 8 msec only if we received
+		 * real RX interrupt (instead of just periodic int), to catch
+		 * any dangling Rx interrupt.  If it was just the periodic
+		 * interrupt, there was no dangling Rx activity, and no need
+		 * to extend the periodic interrupt; one-shot is enough.
+		 */
+		if (r1 & (IWM_CSR_INT_BIT_FH_RX | IWM_CSR_INT_BIT_SW_RX))
 			IWM_WRITE_1(sc, IWM_CSR_INT_PERIODIC_REG,
 			    IWM_CSR_INT_PERIODIC_ENA);
+
+		iwm_notif_intr(sc);
 	}
 
 	rv = 1;
@@ -9221,7 +9264,6 @@ iwm_attach(struct device *parent, struct device *self, void *aux)
 	timeout_set(&sc->sc_led_blink_to, iwm_led_blink_timeout, sc);
 	task_set(&sc->init_task, iwm_init_task, sc);
 	task_set(&sc->newstate_task, iwm_newstate_task, sc);
-	task_set(&sc->setrates_task, iwm_setrates_task, sc);
 	task_set(&sc->ba_task, iwm_ba_task, sc);
 	task_set(&sc->htprot_task, iwm_htprot_task, sc);
 

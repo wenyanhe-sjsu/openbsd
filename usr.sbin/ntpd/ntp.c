@@ -1,4 +1,4 @@
-/*	$OpenBSD: ntp.c,v 1.162 2019/11/11 06:32:52 otto Exp $ */
+/*	$OpenBSD: ntp.c,v 1.164 2020/04/11 07:49:48 otto Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -42,7 +42,7 @@
 
 volatile sig_atomic_t	 ntp_quit = 0;
 struct imsgbuf		*ibuf_main;
-struct imsgbuf		*ibuf_dns;
+static struct imsgbuf	*ibuf_dns;
 struct ntpd_conf	*conf;
 struct ctl_conns	 ctl_conns;
 u_int			 peer_cnt;
@@ -228,7 +228,7 @@ ntp_main(struct ntpd_conf *nconf, struct passwd *pw, int argc, char **argv)
 
 		memset(pfd, 0, sizeof(*pfd) * pfd_elms);
 		memset(idx2peer, 0, sizeof(*idx2peer) * idx2peer_elms);
-		nextaction = getmonotime() + 3600;
+		nextaction = getmonotime() + 900;
 		pfd[PFD_PIPE_MAIN].fd = ibuf_main->fd;
 		pfd[PFD_PIPE_MAIN].events = POLLIN;
 		pfd[PFD_PIPE_DNS].fd = ibuf_dns->fd;

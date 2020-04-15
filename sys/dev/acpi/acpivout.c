@@ -1,6 +1,6 @@
-/*	$OpenBSD: acpivout.c,v 1.18 2020/01/28 14:06:16 patrick Exp $	*/
+/*	$OpenBSD: acpivout.c,v 1.21 2020/04/06 00:01:08 pirofti Exp $	*/
 /*
- * Copyright (c) 2009 Paul Irofti <pirofti@openbsd.org>
+ * Copyright (c) 2009 Paul Irofti <paul@irofti.net>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -96,9 +96,6 @@ acpivout_match(struct device *parent, void *match, void *aux)
 	    aaa->aaa_table != NULL)
 		return (0);
 
-	if (ws_get_param || ws_set_param)
-		return (0);
-
 	return (1);
 }
 
@@ -115,6 +112,10 @@ acpivout_attach(struct device *parent, struct device *self, void *aux)
 
 	aml_register_notify(sc->sc_devnode, aaa->aaa_dev,
 	    acpivout_notify, sc, ACPIDEV_NOPOLL);
+
+	if (!aml_searchname(sc->sc_devnode, "_BQC") ||
+	    ws_get_param || ws_set_param)
+		return;
 
 	ws_get_param = acpivout_get_param;
 	ws_set_param = acpivout_set_param;
@@ -226,8 +227,10 @@ acpivout_get_brightness(struct acpivout_softc *sc)
 	aml_freevalue(&res);
 	DPRINTF(("%s: BQC = %d\n", DEVNAME(sc), level));
 
-	if (level < sc->sc_bcl[0] || level > sc->sc_bcl[sc->sc_bcl_len -1])
-		level = -1;
+	if (level < sc->sc_bcl[0])
+		level = sc->sc_bcl[0];
+	else if (level > sc->sc_bcl[sc->sc_bcl_len - 1])
+		level = sc->sc_bcl[sc->sc_bcl_len - 1];
 
 	return (level);
 }
@@ -238,9 +241,6 @@ acpivout_select_brightness(struct acpivout_softc *sc, int nlevel)
 	int nindex, level;
 
 	level = sc->sc_brightness;
-	if (level == -1)
-		return level;
-
 	nindex = acpivout_find_brightness(sc, nlevel);
 	if (sc->sc_bcl[nindex] == level) {
 		if (nlevel > level && (nindex + 1 < sc->sc_bcl_len))
@@ -374,13 +374,11 @@ acpivout_set_param(struct wsdisplay_param *dp)
 		}
 		if (sc != NULL && sc->sc_bcl_len != 0) {
 			nindex = acpivout_select_brightness(sc, dp->curval);
-			if (nindex != -1) {
-				sc->sc_brightness = sc->sc_bcl[nindex];
-				acpi_addtask(sc->sc_acpi,
-				    acpivout_set_brightness, sc, 0);
-				acpi_wakeup(sc->sc_acpi);
-				return 0;
-			}
+			sc->sc_brightness = sc->sc_bcl[nindex];
+			acpi_addtask(sc->sc_acpi,
+			    acpivout_set_brightness, sc, 0);
+			acpi_wakeup(sc->sc_acpi);
+			return 0;
 		}
 		return -1;
 	default:

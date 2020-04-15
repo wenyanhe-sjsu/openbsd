@@ -1,4 +1,4 @@
-/*	$OpenBSD: cd9660_vnops.c,v 1.81 2020/01/20 23:21:55 claudio Exp $	*/
+/*	$OpenBSD: cd9660_vnops.c,v 1.83 2020/04/07 13:27:51 visa Exp $	*/
 /*	$NetBSD: cd9660_vnops.c,v 1.42 1997/10/16 23:56:57 christos Exp $	*/
 
 /*-
@@ -959,21 +959,21 @@ int filt_cd9660write(struct knote *kn, long hint);
 int filt_cd9660vnode(struct knote *kn, long hint);
 
 const struct filterops cd9660read_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_cd9660detach,
 	.f_event	= filt_cd9660read,
 };
 
 const struct filterops cd9660write_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_cd9660detach,
 	.f_event	= filt_cd9660write,
 };
 
 const struct filterops cd9660vnode_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_cd9660detach,
 	.f_event	= filt_cd9660vnode,
@@ -1002,7 +1002,7 @@ cd9660_kqfilter(void *v)
 
 	kn->kn_hook = (caddr_t)vp;
 
-	SLIST_INSERT_HEAD(&vp->v_selectinfo.si_note, kn, kn_selnext);
+	klist_insert(&vp->v_selectinfo.si_note, kn);
 
 	return (0);
 }
@@ -1012,7 +1012,7 @@ filt_cd9660detach(struct knote *kn)
 {
 	struct vnode *vp = (struct vnode *)kn->kn_hook;
 
-	SLIST_REMOVE(&vp->v_selectinfo.si_note, kn, knote, kn_selnext);
+	klist_remove(&vp->v_selectinfo.si_note, kn);
 }
 
 int

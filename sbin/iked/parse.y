@@ -1,4 +1,4 @@
-/*	$OpenBSD: parse.y,v 1.88 2019/12/03 12:38:34 tobhe Exp $	*/
+/*	$OpenBSD: parse.y,v 1.93 2020/04/14 11:30:15 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -426,7 +426,7 @@ typedef struct {
 %type	<v.id>			id
 %type	<v.transforms>		transforms
 %type	<v.filters>		filters
-%type	<v.ikemode>		ikeflags ikematch ikemode ipcomp
+%type	<v.ikemode>		ikeflags ikematch ikemode ipcomp tmode
 %type	<v.ikeauth>		ikeauth
 %type	<v.ikekey>		keyspec
 %type	<v.mode>		ike_sas child_sas
@@ -486,6 +486,8 @@ set		: SET ACTIVE	{ passive = 0; }
 user		: USER STRING STRING		{
 			if (create_user($2, $3) == -1)
 				YYERROR;
+			free($2);
+			free($3);
 		}
 		;
 
@@ -528,6 +530,7 @@ cfg		: CONFIG STRING host_spec	{
 				free($3);
 				YYERROR;
 			}
+			free($2);
 			$$ = $3;
 			$$->type = xf->id;
 			$$->action = IKEV2_CP_REPLY;	/* XXX */
@@ -643,6 +646,7 @@ portval		: STRING				{
 				yyerror("unknown port: %s", $1);
 				YYERROR;
 			}
+			free($1);
 		}
 		| NUMBER				{
 			if ($1 > USHRT_MAX || $1 < 0) {
@@ -767,6 +771,7 @@ transform	: AUTHXF STRING			{
 				yyerror("%s not a valid transform", $2);
 				YYERROR;
 			}
+			free($2);
 			ipsec_transforms->authxf = xfs;
 			ipsec_transforms->nauthxf++;
 		}
@@ -781,6 +786,7 @@ transform	: AUTHXF STRING			{
 				yyerror("%s not a valid transform", $2);
 				YYERROR;
 			}
+			free($2);
 			ipsec_transforms->encxf = xfs;
 			ipsec_transforms->nencxf++;
 		}
@@ -795,6 +801,7 @@ transform	: AUTHXF STRING			{
 				yyerror("%s not a valid transform", $2);
 				YYERROR;
 			}
+			free($2);
 			ipsec_transforms->prfxf = xfs;
 			ipsec_transforms->nprfxf++;
 		}
@@ -809,6 +816,7 @@ transform	: AUTHXF STRING			{
 				yyerror("%s not a valid transform", $2);
 				YYERROR;
 			}
+			free($2);
 			ipsec_transforms->groupxf = xfs;
 			ipsec_transforms->ngroupxf++;
 		}
@@ -890,7 +898,7 @@ child_sa	: CHILDSA	{
 		}
 		;
 
-ikeflags	: ikematch ikemode ipcomp	{ $$ = $1 | $2 | $3; }
+ikeflags	: ikematch ikemode ipcomp tmode { $$ = $1 | $2 | $3 | $4; }
 		;
 
 ikematch	: /* empty */			{ $$ = 0; }
@@ -906,6 +914,11 @@ ikemode		: /* empty */			{ $$ = IKED_POLICY_PASSIVE; }
 
 ipcomp		: /* empty */			{ $$ = 0; }
 		| IPCOMP			{ $$ = IKED_POLICY_IPCOMP; }
+		;
+
+tmode		: /* empty */			{ $$ = 0; }
+		| TUNNEL			{ $$ = 0; }
+		| TRANSPORT			{ $$ = IKED_POLICY_TRANSPORT; }
 		;
 
 ikeauth		: /* empty */			{
@@ -964,6 +977,7 @@ byte_spec	: NUMBER			{
 				yyerror("invalid byte specification: %s", $1);
 				YYERROR;
 			}
+			free($1);
 			switch (toupper((unsigned char)unit)) {
 			case 'K':
 				bytes *= 1024;
@@ -993,6 +1007,7 @@ time_spec	: NUMBER			{
 				yyerror("invalid time specification: %s", $1);
 				YYERROR;
 			}
+			free($1);
 			switch (tolower((unsigned char)unit)) {
 			case 'm':
 				seconds *= 60;
@@ -1979,7 +1994,6 @@ set_policy(char *idstr, int type, struct iked_policy *pol)
 		return (-1);
 	}
 
-	lc_string(idstr);
 	if ((size_t)snprintf(keyfile, sizeof(keyfile),
 	    IKED_CA IKED_PUBKEY_DIR "%s/%s", prefix,
 	    idstr) >= sizeof(keyfile)) {
@@ -2464,6 +2478,14 @@ print_policy(struct iked_policy *pol)
 		print_verbose(" active");
 	else
 		print_verbose(" passive");
+	
+	if (pol->pol_flags & IKED_POLICY_IPCOMP)
+		print_verbose(" ipcomp");
+
+	if (pol->pol_flags & IKED_POLICY_TRANSPORT)
+		print_verbose(" transport");
+	else
+		print_verbose(" tunnel");
 
 	print_verbose(" %s", print_xf(pol->pol_saproto, 0, saxfs));
 
@@ -3046,6 +3068,9 @@ done:
 		RB_REMOVE(iked_flows, &pol.pol_flows, flow);
 		free(flow);
 	}
+	free(name);
+	free(srcid);
+	free(dstid);
 	return (ret);
 }
 

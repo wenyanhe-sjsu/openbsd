@@ -1,4 +1,4 @@
-/*      $OpenBSD: tag.h,v 1.10 2020/01/20 10:29:31 schwarze Exp $    */
+/* $OpenBSD: tag.h,v 1.13 2020/04/07 22:45:37 schwarze Exp $ */
 /*
  * Copyright (c) 2015, 2018, 2019, 2020 Ingo Schwarze <schwarze@openbsd.org>
  *
@@ -13,6 +13,9 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * Internal interfaces to tag syntax tree nodes.
+ * For use by mandoc(1) validation modules only.
  */
 
 /*
@@ -25,19 +28,8 @@
 #define	TAG_FALLBACK	(INT_MAX - 1)	/* Tag only used if unique. */
 #define	TAG_DELETE	(INT_MAX)	/* Tag not used at all. */
 
-
-struct	tag_files {
-	char	 ofn[20];
-	char	 tfn[20];
-	char	*tagname;
-	int	 ofd;
-	int	 tfd;
-	pid_t	 tcpgid;
-	pid_t	 pager_pid;
-};
-
-
-struct tag_files *tag_init(char *);
-void	 tag_put(const char *, int, size_t);
-void	 tag_write(void);
-void	 tag_unlink(void);
+void		 tag_alloc(void);
+int		 tag_exists(const char *);
+void		 tag_put(const char *, int, struct roff_node *);
+void		 tag_postprocess(struct roff_node *);
+void		 tag_free(void);

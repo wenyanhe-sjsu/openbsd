@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwmvar.h,v 1.49 2019/12/18 09:52:15 stsp Exp $	*/
+/*	$OpenBSD: if_iwmvar.h,v 1.55 2020/04/03 08:32:21 stsp Exp $	*/
 
 /*
  * Copyright (c) 2014 genua mbh <info@genua.de>
@@ -258,7 +258,8 @@ struct iwm_tx_data {
 	bus_addr_t	scratch_paddr;
 	struct mbuf	*m;
 	struct iwm_node *in;
-	int done;
+	int txmcs;
+	int txrate;
 };
 
 struct iwm_tx_ring {
@@ -270,6 +271,7 @@ struct iwm_tx_ring {
 	int			qid;
 	int			queued;
 	int			cur;
+	int			tail;
 };
 
 #define IWM_RX_MQ_RING_COUNT	512
@@ -374,7 +376,6 @@ struct iwm_softc {
 	struct task		init_task; /* NB: not reference-counted */
 	struct refcnt		task_refs;
 	struct task		newstate_task;
-	struct task		setrates_task;
 	enum ieee80211_state	ns_nstate;
 	int			ns_arg;
 
@@ -550,13 +551,10 @@ struct iwm_node {
 	int chosen_txrate;
 	struct ieee80211_mira_node in_mn;
 	int chosen_txmcs;
-
-	/* Set in 11n mode if we don't receive ACKs for OFDM frames. */
-	int ht_force_cck;
-
 };
 #define IWM_STATION_ID 0
 #define IWM_AUX_STA_ID 1
+#define IWM_MONITOR_STA_ID 2
 
 #define IWM_ICT_SIZE		4096
 #define IWM_ICT_COUNT		(IWM_ICT_SIZE / sizeof (uint32_t))

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_aggr.c,v 1.27 2019/12/23 09:03:24 dlg Exp $ */
+/*	$OpenBSD: if_aggr.c,v 1.29 2020/04/12 06:59:54 dlg Exp $ */
 
 /*
  * Copyright (c) 2019 The University of Queensland
@@ -589,8 +589,10 @@ aggr_clone_destroy(struct ifnet *ifp)
 	if_detach(ifp);
 
 	/* last ref, no need to lock. aggr_p_dtor locks anyway */
+	NET_LOCK();
 	while ((p = TAILQ_FIRST(&sc->sc_ports)) != NULL)
 		aggr_p_dtor(sc, p, "destroy");
+	NET_UNLOCK();
 
 	free(sc, M_DEVBUF, sizeof(*sc));
 
@@ -1022,8 +1024,7 @@ aggr_set_options(struct aggr_softc *sc, const struct trunk_opts *tro)
 		break;
 
 	case TRUNK_OPT_LACP_TIMEOUT:
-		if (opt->lacp_timeout > nitems(aggr_periodic_times) ||
-		    aggr_periodic_times[opt->lacp_timeout] == 0)
+		if (opt->lacp_timeout >= nitems(aggr_periodic_times))
 			return (EINVAL);
 
 		aggr_set_lacp_timeout(sc, opt->lacp_timeout);

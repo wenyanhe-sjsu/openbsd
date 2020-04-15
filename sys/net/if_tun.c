@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tun.c,v 1.217 2020/01/31 02:58:28 dlg Exp $	*/
+/*	$OpenBSD: if_tun.c,v 1.221 2020/04/12 11:56:52 mpi Exp $	*/
 /*	$NetBSD: if_tun.c,v 1.24 1996/05/07 02:40:48 thorpej Exp $	*/
 
 /*
@@ -133,14 +133,14 @@ void	filt_tunwdetach(struct knote *);
 void	tun_link_state(struct tun_softc *, int);
 
 const struct filterops tunread_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_tunrdetach,
 	.f_event	= filt_tunread,
 };
 
 const struct filterops tunwrite_filtops = {
-	.f_isfd		= 1,
+	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_tunwdetach,
 	.f_event	= filt_tunwrite,
@@ -625,11 +625,9 @@ tun_wakeup(struct tun_softc *sc)
 	if (sc->sc_reading)
 		wakeup(&sc->sc_if.if_snd);
 
-	KERNEL_LOCK();
 	selwakeup(&sc->sc_rsel);
 	if (sc->sc_flags & TUN_ASYNC)
 		pgsigio(&sc->sc_sigio, SIGIO, 0);
-	KERNEL_UNLOCK();
 }
 
 /*
@@ -868,9 +866,9 @@ tun_dev_write(dev_t dev, struct uio *uio, int ioflag, int align)
 	if (error != 0)
 		goto drop;
 
-	NET_RLOCK();
+	NET_LOCK();
 	if_vinput(ifp, m0);
-	NET_RUNLOCK();
+	NET_UNLOCK();
 
 	tun_put(sc);
 	return (0);
@@ -1003,7 +1001,7 @@ tun_dev_kqfilter(dev_t dev, struct knote *kn)
 	kn->kn_hook = (caddr_t)sc; /* XXX give the sc_ref to the hook? */
 
 	s = splhigh();
-	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	klist_insert(klist, kn);
 	splx(s);
 
 put:
@@ -1018,7 +1016,7 @@ filt_tunrdetach(struct knote *kn)
 	struct tun_softc	*sc = kn->kn_hook;
 
 	s = splhigh();
-	SLIST_REMOVE(&sc->sc_rsel.si_note, kn, knote, kn_selnext);
+	klist_remove(&sc->sc_rsel.si_note, kn);
 	splx(s);
 }
 
@@ -1040,7 +1038,7 @@ filt_tunwdetach(struct knote *kn)
 	struct tun_softc	*sc = kn->kn_hook;
 
 	s = splhigh();
-	SLIST_REMOVE(&sc->sc_wsel.si_note, kn, knote, kn_selnext);
+	klist_remove(&sc->sc_wsel.si_note, kn);
 	splx(s);
 }
 

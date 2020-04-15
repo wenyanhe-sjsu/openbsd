@@ -67,11 +67,11 @@
 ./usr/lib/crtbeginS.o
 ./usr/lib/crtend.o
 ./usr/lib/crtendS.o
-./usr/lib/gcc-lib/alpha-unknown-openbsd6.6
-./usr/lib/gcc-lib/alpha-unknown-openbsd6.6/4.2.1
-./usr/lib/gcc-lib/alpha-unknown-openbsd6.6/4.2.1/collect2
-./usr/lib/gcc-lib/alpha-unknown-openbsd6.6/4.2.1/libgcc.a
-./usr/lib/gcc-lib/alpha-unknown-openbsd6.6/4.2.1/specs
+./usr/lib/gcc-lib/alpha-unknown-openbsd6.7
+./usr/lib/gcc-lib/alpha-unknown-openbsd6.7/4.2.1
+./usr/lib/gcc-lib/alpha-unknown-openbsd6.7/4.2.1/collect2
+./usr/lib/gcc-lib/alpha-unknown-openbsd6.7/4.2.1/libgcc.a
+./usr/lib/gcc-lib/alpha-unknown-openbsd6.7/4.2.1/specs
 ./usr/lib/libstdc++.so.57.0
 ./usr/libdata/perl5/alpha-openbsd
 ./usr/libdata/perl5/alpha-openbsd/.packlist
@@ -455,7 +455,6 @@
 ./usr/libdata/perl5/alpha-openbsd/auto/Term
 ./usr/libdata/perl5/alpha-openbsd/auto/Term/ReadKey
 ./usr/libdata/perl5/alpha-openbsd/auto/Term/ReadKey/ReadKey.so
-./usr/libdata/perl5/alpha-openbsd/auto/Term/ReadKey/autosplit.ix
 ./usr/libdata/perl5/alpha-openbsd/auto/Tie
 ./usr/libdata/perl5/alpha-openbsd/auto/Tie/Hash
 ./usr/libdata/perl5/alpha-openbsd/auto/Tie/Hash/NamedCapture
