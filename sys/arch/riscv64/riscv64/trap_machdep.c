@@ -26,6 +26,10 @@
 #include <machine/riscvreg.h>
 #include <machine/syscall.h>
 
+#ifdef DDB
+#include <machine/db_machdep.h>
+#endif
+
 /* Called from trap.S */
 void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
@@ -257,6 +261,7 @@ cpu_fetch_syscall_args(struct thread *td)
 
 	return (0);
 }
+#endif
 
 static void
 data_abort(struct trapframe *frame, int usermode)
@@ -266,7 +271,8 @@ data_abort(struct trapframe *frame, int usermode)
 	struct thread *td;
 	struct pcb *pcb;
 	vm_prot_t ftype;
-	vm_offset_t va;
+	//vm_offset_t va;
+	vaddr_t va;
 	struct proc *p;
 	int error, sig, ucode;
 
@@ -334,6 +340,6 @@ fatal:
 	dump_regs(frame);
 	panic("Fatal page fault at %#lx: %#016lx", frame->tf_sepc, stval);
 }
-#endif //0
+//#endif //0
 
 
