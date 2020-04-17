@@ -26,7 +26,7 @@
 #include <machine/riscvreg.h>
 #include <machine/syscall.h>
 
-/* Called from exception.S */
+/* Called from trap.S */
 void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
 

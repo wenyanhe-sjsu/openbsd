@@ -184,26 +184,26 @@
 2:
 .endm
 
-ENTRY(cpu_exception_handler)
+ENTRY(cpu_trap_handler)
 	csrrw	sp, sscratch, sp
 	beqz	sp, 1f
 	/* User mode detected */
-	j	cpu_exception_handler_user
+	j	cpu_trap_handler_user
 1:
 	/* Supervisor mode detected */
 	csrrw	sp, sscratch, sp
-	j	cpu_exception_handler_supervisor
-END(cpu_exception_handler)
+	j	cpu_trap_handler_supervisor
+END(cpu_trap_handler)
 
-ENTRY(cpu_exception_handler_supervisor)
+ENTRY(cpu_trap_handler_supervisor)
 	save_registers 1
 	mv	a0, sp
 	call	_C_LABEL(do_trap_supervisor)
 	restore_registers 1
 	sret
-END(cpu_exception_handler_supervisor)
+END(cpu_trap_handler_supervisor)
 
-ENTRY(cpu_exception_handler_user)
+ENTRY(cpu_trap_handler_user)
 	save_registers 0
 	mv	a0, sp
 	call	_C_LABEL(do_trap_user)
@@ -211,7 +211,7 @@ ENTRY(cpu_exception_handler_user)
 	restore_registers 0
 	csrrw	sp, sscratch, sp
 	sret
-END(cpu_exception_handler_user)
+END(cpu_trap_handler_user)
 
 ENTRY(syscall_return)
 	do_ast		// XXX What is this?
