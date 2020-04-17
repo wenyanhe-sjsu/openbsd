@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2020 Shivam Waghela <shivamwaghela@gmail.com>
  * Copyright (c) 2020 Brian Bamsch <bbamsch@google.com>
  * Copyright (c) 2020 Mengshi Li <mengshi.li.mars@gmail.com>
  * Copyright (c) 2015 Dale Rahn <drahn@dalerahn.com>
@@ -20,6 +21,8 @@
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/user.h>
+#include <sys/signalvar.h>
+#include <sys/siginfo.h>
 #include <sys/syscall.h>
 #include <sys/syscall_mi.h>
 
@@ -98,6 +101,94 @@ do_trap_supervisor(struct trapframe *frame)
 	}
 }
 
+static void
+data_abort(struct trapframe *frame, int usermode)
+{
+	struct vm_map *map;
+	uint64_t stval;
+	union sigval sv;
+	struct pcb *pcb;
+	vm_prot_t ftype;
+	vaddr_t va;
+	struct proc *p;
+	int error, sig, code, access_type;
+
+	pcb = curcpu()->ci_curpcb;
+	p = curcpu()->ci_curproc;
+	stval = frame->tf_stval;
+
+	va = trunc_page(stval);
+
+	//if (va >= VM_MAXUSER_ADDRESS)
+	//	curcpu()->ci_flush_bp();
+
+	if ((frame->tf_scause == EXCP_FAULT_STORE) ||
+	    (frame->tf_scause == EXCP_STORE_PAGE_FAULT)) {
+		access_type = PROT_WRITE;
+	} else if (frame->tf_scause == EXCP_INST_PAGE_FAULT) {
+		access_type = PROT_EXEC;
+	} else {
+		access_type = PROT_READ;
+	}
+
+	ftype = VM_FAULT_INVALID; // should check for failed permissions.
+
+	if (usermode)
+		map = &p->p_vmspace->vm_map;
+	else if (stval >= VM_MAX_USER_ADDRESS)
+		map = kernel_map;
+	else {
+		if (pcb->pcb_onfault == 0)
+			goto fatal;
+		map = &p->p_vmspace->vm_map;
+	}
+
+	if (pmap_fault_fixup(map->pmap, va, ftype, usermode))
+		goto done;
+
+	KERNEL_LOCK();
+	error = uvm_fault(map, va, ftype, access_type);
+	KERNEL_UNLOCK();
+
+	if (error != 0) {
+		if (usermode) {
+			if (error == ENOMEM) {
+				sig = SIGKILL;
+				code = 0;
+			} else if (error == EIO) {
+				sig = SIGBUS;
+				code = BUS_OBJERR;
+			} else if (error == EACCES) {
+				sig = SIGSEGV;
+				code = SEGV_ACCERR;
+			} else {
+				sig = SIGSEGV;
+				code = SEGV_MAPERR;
+			}
+			sv.sival_int = stval;
+			KERNEL_LOCK();
+			trapsignal(p, sig, 0, code, sv);
+			KERNEL_UNLOCK();
+		} else {
+			if (curcpu()->ci_idepth == 0 && pcb->pcb_onfault != 0) {
+				frame->tf_a[0] = error;
+				frame->tf_sepc = (register_t)pcb->pcb_onfault;
+				return;
+			}
+			goto fatal;
+		}
+	}
+
+done:
+	if (usermode)
+		userret(p);
+	return;
+
+fatal:
+	dump_regs(frame);
+	panic("Fatal page fault at %#lx: %#016lx", frame->tf_sepc, sv);
+}
+
 void
 do_trap_user(struct trapframe *frame)
 {
@@ -127,7 +218,6 @@ do_trap_user(struct trapframe *frame)
 #endif
 
 	switch(exception) {
-#if 0
 	case EXCP_FAULT_LOAD:
 	case EXCP_FAULT_STORE:
 	case EXCP_FAULT_FETCH:
@@ -136,7 +226,6 @@ do_trap_user(struct trapframe *frame)
 	case EXCP_INST_PAGE_FAULT:
 		data_abort(frame, 1);
 		break;
-#endif
 	case EXCP_USER_ECALL:
 		frame->tf_sepc += 4;	/* Next instruction */
 		svc_handler(frame);
@@ -257,83 +346,5 @@ cpu_fetch_syscall_args(struct thread *td)
 
 	return (0);
 }
-
-static void
-data_abort(struct trapframe *frame, int usermode)
-{
-	struct vm_map *map;
-	uint64_t stval;
-	struct thread *td;
-	struct pcb *pcb;
-	vm_prot_t ftype;
-	vm_offset_t va;
-	struct proc *p;
-	int error, sig, ucode;
-
-#ifdef KDB
-	if (kdb_active) {
-		kdb_reenter();
-		return;
-	}
 #endif
-
-	td = curthread;
-	p = td->td_proc;
-	pcb = td->td_pcb;
-	stval = frame->tf_stval;
-
-	if (td->td_critnest != 0 || td->td_intr_nesting_level != 0 ||
-	    WITNESS_CHECK(WARN_SLEEPOK | WARN_GIANTOK, NULL,
-	    "Kernel page fault") != 0)
-		goto fatal;
-
-	if (usermode)
-		map = &td->td_proc->p_vmspace->vm_map;
-	else if (stval >= VM_MAX_USER_ADDRESS)
-		map = kernel_map;
-	else {
-		if (pcb->pcb_onfault == 0)
-			goto fatal;
-		map = &td->td_proc->p_vmspace->vm_map;
-	}
-
-	va = trunc_page(stval);
-
-	if ((frame->tf_scause == EXCP_FAULT_STORE) ||
-	    (frame->tf_scause == EXCP_STORE_PAGE_FAULT)) {
-		ftype = VM_PROT_WRITE;
-	} else if (frame->tf_scause == EXCP_INST_PAGE_FAULT) {
-		ftype = VM_PROT_EXECUTE;
-	} else {
-		ftype = VM_PROT_READ;
-	}
-
-	if (pmap_fault_fixup(map->pmap, va, ftype))
-		goto done;
-
-	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
-	if (error != KERN_SUCCESS) {
-		if (usermode) {
-			call_trapsignal(td, sig, ucode, (void *)stval);
-		} else {
-			if (pcb->pcb_onfault != 0) {
-				frame->tf_a[0] = error;
-				frame->tf_sepc = pcb->pcb_onfault;
-				return;
-			}
-			goto fatal;
-		}
-	}
-
-done:
-	if (usermode)
-		userret(td, frame);
-	return;
-
-fatal:
-	dump_regs(frame);
-	panic("Fatal page fault at %#lx: %#016lx", frame->tf_sepc, stval);
-}
-#endif //0
-
 
