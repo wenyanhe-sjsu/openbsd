@@ -3,7 +3,7 @@ maxpartitions 16
 maxusers 2 8 64
 
 # Major number for block devices, for ``root on'' lines
-#major	{ sd = 0 }
+major	{ sd = 0 }
 #major	{ cd = 3 }
 #major	{ wd = 4 }
 #major	{ rd = 8 }
