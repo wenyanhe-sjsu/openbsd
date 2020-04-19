@@ -179,8 +179,8 @@
 //	mv	a0, sp
 //	call	_C_LABEL(ast)//XXX TODO: where to define ast
 
-	/* Re-check for new ast scheduled */
-	j	1b
+//	/* Re-check for new ast scheduled */
+//	j	1b
 2:
 .endm
 
