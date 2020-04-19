@@ -136,7 +136,7 @@ ENTRY(copyoutstr)
 	addi	a2, a2, -1
 	addi	a5, a5, 1
 	beqz	t0, .Lcopyiostrsuccess_user
-	beqz	a2, 1b
+	bnez	a2, 1b
 
 	j	.Lcopyiostrtoolong_user
 END(copyoutstr)
