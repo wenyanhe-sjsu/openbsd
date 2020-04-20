@@ -158,28 +158,26 @@
 .endm
 
 .macro	do_ast
-//XXX TODO: 
 	/* Disable interrupts */
-//	csrr	a4, sstatus
+	csrr	a4, sstatus
 1:
-//	csrci	sstatus, (SSTATUS_SIE)
-//
-//	ld	a1, PC_CURTHREAD(tp)
-//	lw	a2, TD_FLAGS(a1)
-//
-//	li	a3, (TDF_ASTPENDING|TDF_NEEDRESCHED)
-//	and	a2, a2, a3
-//	beqz	a2, 2f
-//
-//	/* Restore interrupts */
-//	andi	a4, a4, (SSTATUS_SIE)
-//	csrs	sstatus, a4
-//
-//	/* Handle the ast */
-//	mv	a0, sp
-//	call	_C_LABEL(ast)//XXX TODO: where to define ast
+	csrci	sstatus, (SSTATUS_SIE)
 
-	/* Re-check for new ast scheduled */
+	/* Check for astpending */
+	ld	a1, CI_CURPROC(tp)
+	beqz	a1, 2f
+	lw	a2, P_ASTPENDING(a1)
+	beqz	a2, 2f
+
+	sw	x0, P_ASTPENDING(a1)
+
+	/* Restore interrupts */
+	csrw	sstatus, a4
+
+	/* handle the ast */
+	mv	a0, sp
+	la	t0, _C_LABEL(ast)
+	jalr	t0
 	j	1b
 2:
 .endm
@@ -214,7 +212,8 @@ ENTRY(cpu_trap_handler_user)
 END(cpu_trap_handler_user)
 
 ENTRY(syscall_return)
-	do_ast		// XXX What is this?
+	do_ast
 	restore_registers 0
-	ret
+	csrrw	sp, sscratch, sp
+	sret
 END(syscall_return)
