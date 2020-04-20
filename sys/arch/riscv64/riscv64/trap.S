@@ -216,5 +216,5 @@ END(cpu_trap_handler_user)
 ENTRY(syscall_return)
 	do_ast		// XXX What is this?
 	restore_registers 0
-	ret
+	sret
 END(syscall_return)

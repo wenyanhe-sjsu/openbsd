@@ -15,7 +15,6 @@
     * Interrupts not restored during System Call
     * Floating Point Registers not saved during System Call
     * System Call does not signal success / failure
-    * Ensure that ERESTART error PC adjustment makes it back to process state
 * Misc
     * revisit settings in param.h (FDT / ACPI / U-Area / Clusters / Buffer)
     * Look into implementing riscv64/cpufunc.c, if necessary
