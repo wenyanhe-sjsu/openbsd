@@ -11,6 +11,8 @@
 * Context Switch
     * switchframe not being initialized on cpu\_fork
     * child\_return logic is best-guess. Consider re-evaluting at later point in time
+* Trap
+    * Look into whether we can detect user / supervisor traps with SSTATUS\_SPP
 * System Calls
     * Interrupts not restored during System Call
     * Floating Point Registers not saved during System Call
@@ -18,3 +20,5 @@
 * Misc
     * revisit settings in param.h (FDT / ACPI / U-Area / Clusters / Buffer)
     * Look into implementing riscv64/cpufunc.c, if necessary
+* Program Load
+    * Revisit program entrypoint initialization (is it sane?)
