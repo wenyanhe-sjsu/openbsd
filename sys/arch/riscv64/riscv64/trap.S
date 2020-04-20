@@ -214,5 +214,6 @@ END(cpu_trap_handler_user)
 ENTRY(syscall_return)
 	do_ast
 	restore_registers 0
+	csrrw	sp, sscratch, sp
 	sret
 END(syscall_return)
